@@ -1,0 +1,79 @@
+// ============================================================
+// 设计 Token — 校园二手交易小程序
+// 来源：docs/UI设计系统文档.md §二~四
+// ============================================================
+
+// ── 色彩系统 (§二) ──────────────────────────────────────────
+// 灰色系（主色调）
+$color-bg:            #F8F8F8;   // 页面主背景
+$color-surface:       #FFFFFF;   // 卡片、弹窗背景
+$color-divider:       #F0F0F0;   // 分割线、占位区域
+$color-muted:         #999999;   // 辅助文字、占位符
+$color-body:          #666666;   // 正文文字
+$color-title:         #333333;   // 标题文字
+
+// 蓝色系（点缀色）
+$color-primary:       #4A90D9;   // 按钮、链接、强调元素
+$color-primary-dark:  #3A7BC8;   // 按钮悬停/点击态
+$color-primary-light: #E8F1FB;   // 选中状态、提示背景
+$color-primary-gradient: linear-gradient(135deg, #4A90D9, #3A7BC8);
+
+// 功能色
+$color-success:       #52C41A;   // 成功提示、完成状态
+$color-warning:       #FAAD14;   // 警告提示、待处理状态
+$color-error:         #FF4D4F;   // 错误提示、删除操作
+$color-info:          #4A90D9;   // 信息提示
+
+// 透明度
+$opacity-overlay:     0.80;      // 遮罩层
+$opacity-disabled:    0.60;      // 禁用状态
+$opacity-placeholder: 0.40;      // 占位图、加载状态
+
+// ── 字体系统 (§三) ──────────────────────────────────────────
+$font-chinese: "PingFang SC", "Noto Sans SC", sans-serif;
+$font-mono:    "SF Mono", "DIN", monospace;  // 价格、时间
+
+// 字号（rpx，基于 375px 基准：1px = 2rpx）
+$text-xs:   22rpx;   // 11px — 标签、状态文字
+$text-sm:   24rpx;   // 12px — 辅助说明、时间戳
+$text-base: 28rpx;   // 14px — 正文
+$text-lg:   36rpx;   // 18px — 卡片标题
+$text-xl:   40rpx;   // 20px — 页面标题
+$text-2xl:  48rpx;
+$text-3xl:  64rpx;
+
+// 字重
+$weight-bold:    600;
+$weight-medium:  500;
+$weight-regular: 400;
+
+// 行高
+$line-height: 1.5;
+
+// ── 布局系统 (§四) ──────────────────────────────────────────
+$space-page:    32rpx;    // 16px — 页面边距
+$space-card:    24rpx;    // 12px — 卡片间距
+$space-content: 16rpx;    // 8px  — 元素内部间距
+
+// 圆角
+$radius-card:   16rpx;    // 8px — 卡片、按钮、图片、输入框
+$radius-modal:  24rpx;    // 12px — 弹窗
+$radius-full:   9999rpx;
+
+// 阴影
+$shadow-card:   0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+$shadow-button: 0 4rpx 8rpx rgba(74, 144, 217, 0.30);
+$shadow-modal:  0 16rpx 48rpx rgba(0, 0, 0, 0.15);
+
+// 组件尺寸
+$btn-height-lg: 96rpx;    // 48px
+$btn-height-md: 80rpx;    // 40px
+$btn-height-sm: 64rpx;    // 32px
+$input-height:  88rpx;    // 44px
+$tag-height-lg: 56rpx;    // 28px
+$tag-height-md: 44rpx;    // 22px
+$tag-height-sm: 36rpx;    // 18px
+$progress-height: 8rpx;   // 4px
+
+// 安全区
+$safe-area-bottom: env(safe-area-inset-bottom, 0);

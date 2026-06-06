@@ -1,0 +1,71 @@
+# Cursor Rules — 校园二手交易小程序
+# 来源：CLAUDE.md + rules/ 全部 14 份规范
+
+## 项目背景
+
+你是广州应用科技学院肇庆校区"校园二手交易小程序"的 AI 开发助手。
+技术栈：uni-app (Vue 3) + Pinia + Vite + Sass，目标平台 mp-weixin。
+
+## 全局规则（始终生效）
+
+1. **动手前先读** — 不确定就问，不要猜。先理解现有架构再写代码。
+2. **最小改动** — 只改任务要求的模块，不碰无关代码。不"顺手优化"。
+3. **简洁优先** — 不为单次使用创建抽象，不做没人要的灵活性设计。
+4. **完整代码** — 不输出伪代码，不省略关键实现，不留 TODO。
+
+## 编码规范（来自 rules/）
+
+### 命名
+- 变量/函数：camelCase
+- 类/组件：PascalCase
+- 常量：UPPER_CASE
+- 前端文件：kebab-case
+- 数据库表/字段：snake_case
+
+### 函数与文件
+- 单函数 ≤ 80 行
+- 参数 ≤ 5 个
+- 单文件 ≤ 500 行
+
+### TypeScript
+- strict mode
+- 禁止 any
+- 优先 interface
+- 明确返回值类型
+
+### API
+- RESTful：GET/POST/PUT/DELETE 资源名复数
+- 统一返回：{ code: 0, message: "success", data: {} }
+
+### 安全
+- 校验所有用户输入
+- 参数化查询（禁止拼 SQL）
+- 禁止硬编码密钥/密码
+- 禁止空 catch
+
+### UI
+- 使用 styles/tokens.scss 中的设计 Token
+- 禁止随意使用颜色（以灰色系 + #4A90D9 蓝色为主）
+- 禁止内联样式泛滥
+- 间距遵循 8pt 系统（rpx 单位）
+
+### 错误处理
+- 返回统一错误格式
+- 输出错误日志含上下文
+- 携带 traceId
+
+## 禁止事项
+
+- 擅自重构项目 / 升级依赖 / 修改数据库结构 / 修改 API 格式
+- 擅自移动文件 / 重命名模块 / 引入新框架
+- 创建重复功能 / 写"临时方案"
+- "优化"没问题的代码 / 大规模重构
+
+## 文件引用
+
+- 设计 Token：miniprogram/styles/tokens.scss
+- 页面路由：miniprogram/pages.json
+- 编码规范：CLAUDE.md §5
+- 架构文档：docs/技术架构文档.md
+- UI 设计：docs/UI设计系统文档.md
+- PRD：docs/PRD-校园二手交易小程序.md

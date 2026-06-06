@@ -1,0 +1,4 @@
+- [项目当前状态](project-state.md) — 前后端完成度：后端 ~80% (57 文件)，前端 ~5% (38 占位)，关键指标，阻塞项
+- [已知 Bug](known-bugs.md) — BUG-001 token_version 字段名不匹配 (P0 安全漏洞)，BUG-002 health check 空 catch
+- [文档清单](document-inventory.md) — docs/ 下 16 份已生成文档的用途和状态索引
+- [编码规范核心约束](rules-summary.md) — rules/ 14 份规范红线速查表

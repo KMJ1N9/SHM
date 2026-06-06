@@ -1,0 +1,43 @@
+{
+  "name": "campus-market-server",
+  "version": "1.0.0",
+  "description": "校园二手交易小程序 — Express 后端",
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "nodemon",
+    "start": "cross-env NODE_ENV=production node src/app.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "db:migrate": "cross-env node src/models/migrate.js up",
+    "db:migrate:rollback": "cross-env node src/models/migrate.js down",
+    "db:migrate:status": "cross-env node src/models/migrate.js status",
+    "db:migrate:reset": "cross-env node src/models/migrate.js reset",
+    "db:seed": "cross-env node seeds/dev.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "cos-nodejs-sdk-v5": "^2.14.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.12.0",
+    "node-cron": "^3.0.3",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}

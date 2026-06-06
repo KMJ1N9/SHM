@@ -1,0 +1,63 @@
+{
+  "compilerOptions": {
+    // ---- 语言与环境 ----
+    "target": "ES2021",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+
+    // ---- 严格模式（coding-standards.md 强制要求）----
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+
+    // ---- 额外类型检查 ----
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    // ---- 路径别名（与 vite.config.js resolve.alias 保持一致）----
+    "paths": {
+      "@/*": ["./*"]
+    },
+
+    // ---- 模块解析 ----
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    // ---- Vue 3 类型支持 ----
+    "types": ["@dcloudio/types"]
+  },
+
+  "include": [
+    "*.vue",
+    "*.ts",
+    "*.js",
+    "**/*.vue",
+    "**/*.ts",
+    "**/*.js",
+    "pages/**/*",
+    "components/**/*",
+    "api/**/*",
+    "store/**/*",
+    "utils/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "unpackage",
+    "dist"
+  ]
+}
