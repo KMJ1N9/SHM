@@ -3,6 +3,7 @@
  */
 
 const reviewService = require('../services/review');
+const { badRequest } = require('../utils/errors');
 
 const reviewController = {
   /**
@@ -34,7 +35,7 @@ const reviewController = {
         });
         return res.json({ code: 0, message: 'ok', data: result });
       }
-      res.status(400).json({ code: 4001, message: '请提供 order_id 或 user_id' });
+      throw badRequest('请提供 order_id 或 user_id');
     } catch (err) {
       next(err);
     }

@@ -18,10 +18,10 @@ const config = require('../config');
 const errors = require('../utils/errors');
 const { query } = require('../models/db');
 
-/** 不需要鉴权的路径白名单 */
+/** 不需要鉴权的路径白名单（路径相对于挂载点 /api） */
 const EXEMPT_PATHS = [
-  { method: 'POST', path: '/api/auth/login' },
-  { method: 'GET', path: '/api/health' },
+  { method: 'POST', path: '/auth/login' },
+  { method: 'GET', path: '/health' },
 ];
 
 /**

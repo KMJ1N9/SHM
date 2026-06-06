@@ -9,8 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "db:migrate": "cross-env node src/models/migrate.js up",
-    "db:migrate:rollback": "cross-env node src/models/migrate.js down",
+    "db:migrate": "cross-env node src/models/migrate.js migrate",
+    "db:migrate:rollback": "cross-env node src/models/migrate.js rollback",
     "db:migrate:status": "cross-env node src/models/migrate.js status",
     "db:migrate:reset": "cross-env node src/models/migrate.js reset",
     "db:seed": "cross-env node seeds/dev.js"

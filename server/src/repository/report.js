@@ -5,7 +5,8 @@
  * 同时负责写入 admin_logs（管理员操作审计）。
  */
 
-const { query } = require('../models/db');
+const { query, transaction } = require('../models/db');
+const { notFound } = require('../utils/errors');
 
 const REPORT_FIELDS = [
   'id', 'reporter_id', 'reported_user_id', 'product_id', 'order_id',
@@ -98,12 +99,80 @@ const reportRepo = {
   },
 
   /**
+   * 裁决工单并扣减信誉分（事务：工单裁决 + 信誉分扣减 + 变动通知，原子操作）
+   *
+   * 使用 FOR UPDATE 锁定用户行，确保并发场景下信誉分计算正确。
+   *
+   * @param {Object} params
+   * @param {number} params.ticketId       - 工单 ID
+   * @param {string} params.resolution     - 裁决结果
+   * @param {number} params.reportedUserId - 被举报人 ID
+   * @param {number} params.deductCredit   - 扣减分值（0 表示不扣分）
+   * @param {number} params.creditMax      - 信誉分上限
+   * @returns {Promise<{ticket: Object, newCreditScore?: number}>}
+   */
+  async resolveWithPenalty({ ticketId, resolution, reportedUserId, deductCredit, creditMax }) {
+    return transaction(async (conn) => {
+      // 1. 裁决工单
+      await conn.execute(
+        `UPDATE reports
+         SET status = 'resolved', resolution = ?, resolved_at = NOW()
+         WHERE id = ?`,
+        [resolution, ticketId]
+      );
+
+      const [[ticket]] = await conn.execute(
+        `SELECT ${REPORT_FIELDS} FROM reports WHERE id = ?`,
+        [ticketId]
+      );
+
+      // 2. 扣减信誉分（原子读-改-写，FOR UPDATE 防并发）
+      let newCreditScore;
+      if (deductCredit && deductCredit > 0) {
+        const [[user]] = await conn.execute(
+          'SELECT credit_score FROM users WHERE id = ? FOR UPDATE',
+          [reportedUserId]
+        );
+        if (!user) {
+          throw notFound('用户');
+        }
+
+        const previousScore = user.credit_score;
+        newCreditScore = Math.max(0, Math.min(previousScore - deductCredit, creditMax));
+
+        await conn.execute(
+          'UPDATE users SET credit_score = ? WHERE id = ?',
+          [newCreditScore, reportedUserId]
+        );
+
+        // 3. 写入信誉分变动通知（在同一事务内）
+        const content = `你的信誉分变更为：${newCreditScore}（-${deductCredit} 举报成立）`;
+        const metadata = JSON.stringify({
+          delta: -deductCredit,
+          reason: '举报成立',
+          previous_score: previousScore,
+          current_score: newCreditScore,
+          ref_id: ticketId,
+        });
+
+        await conn.execute(
+          `INSERT INTO notifications (user_id, type, title, content, metadata)
+           VALUES (?, 'credit_change', '信誉分变动', ?, ?)`,
+          [reportedUserId, content, metadata]
+        );
+      }
+
+      return { ticket, newCreditScore };
+    });
+  },
+
+  /**
    * 举报/工单列表（客服管理端）
    * @param {Object} filters - { status?, type?, page, pageSize }
    * @returns {Promise<{list: Array, total: number}>}
    */
   async list(filters = {}) {
-    const { status = 'pending', type = 'all', page = 1, pageSize = 20 } = filters;
+    const { status = 'pending', type = 'all', reporter_id, page = 1, pageSize = 20 } = filters;
     const conditions = ['r.deleted_at IS NULL'];
     const params = [];
 
@@ -115,6 +184,11 @@ const reportRepo = {
       conditions.push('r.type = ?');
       params.push(type);
     }
+    // 前端用户只能查看自己的举报；客服管理端不传 reporter_id 查看全部
+    if (reporter_id) {
+      conditions.push('r.reporter_id = ?');
+      params.push(reporter_id);
+    }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
 
@@ -125,7 +199,9 @@ const reportRepo = {
 
     const offset = (page - 1) * pageSize;
     const rows = await query(
-      `SELECT r.${REPORT_FIELDS},
+      `SELECT r.id, r.reporter_id, r.reported_user_id, r.product_id, r.order_id,
+              r.type, r.description, r.evidence_images, r.status,
+              r.resolution, r.deleted_at, r.resolved_at, r.created_at, r.updated_at,
               reporter.nickname AS reporter_nickname, reporter.avatar AS reporter_avatar,
               reported.nickname AS reported_nickname, reported.avatar AS reported_avatar
        FROM reports r

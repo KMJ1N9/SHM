@@ -16,7 +16,7 @@ const LIST_FIELDS = [
   'p.id', 'p.seller_id', 'p.title', 'p.category', 'p.`condition`',
   'p.price', 'p.original_price', 'p.trade_location', 'p.negotiable',
   'p.images', 'p.status', 'p.created_at',
-  'u.id AS seller_id', 'u.nickname AS seller_nickname',
+  'u.nickname AS seller_nickname',
   'u.avatar AS seller_avatar', 'u.credit_score AS seller_credit_score',
 ].join(', ');
 
@@ -101,7 +101,9 @@ const productRepo = {
    */
   async findById(id) {
     const [row] = await query(
-      `SELECT p.${PRODUCT_FIELDS},
+      `SELECT p.id, p.seller_id, p.title, p.description, p.category, p.\`condition\`,
+              p.original_price, p.price, p.trade_location, p.negotiable, p.images,
+              p.status, p.created_at, p.updated_at,
               u.nickname AS seller_nickname, u.avatar AS seller_avatar,
               u.class_name AS seller_class_name, u.dorm_building AS seller_dorm_building,
               u.credit_score AS seller_credit_score

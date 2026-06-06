@@ -86,12 +86,7 @@ const reviewRepo = {
       [userId]
     );
 
-    // 列表
-    const [countResult] = await query(
-      'SELECT COUNT(*) AS total FROM reviews WHERE reviewee_id = ?',
-      [userId]
-    );
-
+    // 列表（total 复用上方 summary 的聚合结果）
     const offset = (page - 1) * pageSize;
     const rows = await query(
       `SELECT r.id, r.communication_score, r.punctuality_score, r.accuracy_score,
@@ -114,7 +109,7 @@ const reviewRepo = {
         avg_accuracy: summary.avg_accuracy || 0,
       },
       list: rows,
-      total: countResult.total,
+      total: summary.total || 0,
     };
   },
 };

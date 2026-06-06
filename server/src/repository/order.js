@@ -6,6 +6,7 @@
  */
 
 const { query, transaction } = require('../models/db');
+const { notFound, productLocked, orderStateInvalid } = require('../utils/errors');
 
 const ORDER_FIELDS = [
   'id', 'product_id', 'buyer_id', 'seller_id', 'status',
@@ -55,10 +56,10 @@ const orderRepo = {
         [data.product_id]
       );
       if (products.length === 0) {
-        throw new Error('商品不存在');
+        throw notFound('商品');
       }
       if (products[0].status !== 'active') {
-        throw new Error('商品状态不可购买');
+        throw productLocked();
       }
 
       // 更新商品状态
@@ -195,6 +196,88 @@ const orderRepo = {
        WHERE status = 'met' AND met_at < DATE_SUB(NOW(), INTERVAL 3 DAY)`
     );
     return rows;
+  },
+  /**
+   * 确认收货（事务：订单→completed + 商品→sold，原子操作）
+   *
+   * 使用 FOR UPDATE 行锁防止并发修改，事务内二次校验状态。
+   *
+   * @param {number} id - 订单 ID
+   * @returns {Promise<Object>}
+   */
+  async confirmOrder(id) {
+    return transaction(async (conn) => {
+      const [[order]] = await conn.execute(
+        `SELECT id, product_id, status FROM orders WHERE id = ? FOR UPDATE`,
+        [id]
+      );
+      if (!order) {
+        throw notFound('订单');
+      }
+      if (order.status !== 'met') {
+        throw orderStateInvalid('仅已面交状态的订单可确认收货');
+      }
+
+      await conn.execute(
+        'UPDATE orders SET status = ?, confirmed_at = NOW() WHERE id = ?',
+        ['completed', id]
+      );
+      await conn.execute(
+        'UPDATE products SET status = ? WHERE id = ?',
+        ['sold', order.product_id]
+      );
+
+      const [[updated]] = await conn.execute(
+        `SELECT ${ORDER_FIELDS} FROM orders WHERE id = ?`,
+        [id]
+      );
+      return updated;
+    });
+  },
+
+  /**
+   * 取消订单（事务：订单→cancelled + 商品→active，原子操作）
+   *
+   * 使用 FOR UPDATE 行锁防止并发修改，事务内二次校验状态。
+   *
+   * @param {number} id - 订单 ID
+   * @param {string} cancelledBy - 'buyer' | 'seller'
+   * @returns {Promise<Object>}
+   */
+  async cancelOrder(id, cancelledBy) {
+    return transaction(async (conn) => {
+      const [[order]] = await conn.execute(
+        `SELECT id, product_id, status FROM orders WHERE id = ? FOR UPDATE`,
+        [id]
+      );
+      if (!order) {
+        throw notFound('订单');
+      }
+
+      // 事务内二次校验状态（防 TOCTOU）
+      if (order.status === 'pending') {
+        // pending：买卖双方均可取消
+      } else if (order.status === 'met' && cancelledBy === 'buyer') {
+        // met：仅买家可取消
+      } else {
+        throw orderStateInvalid('当前订单状态不可取消');
+      }
+
+      await conn.execute(
+        'UPDATE orders SET status = ?, cancelled_by = ? WHERE id = ?',
+        ['cancelled', cancelledBy, id]
+      );
+      await conn.execute(
+        'UPDATE products SET status = ? WHERE id = ?',
+        ['active', order.product_id]
+      );
+
+      const [[updated]] = await conn.execute(
+        `SELECT ${ORDER_FIELDS} FROM orders WHERE id = ?`,
+        [id]
+      );
+      return updated;
+    });
   },
 };
 

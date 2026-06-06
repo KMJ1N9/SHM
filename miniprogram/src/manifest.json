@@ -1,0 +1,20 @@
+{
+  "name": "校园二手交易",
+  "appid": "",
+  "description": "校园二手交易小程序 — 帮助广应科肇庆校区学生实现安全可信的闲置物品面交换",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "wx0c4d54c24d540539",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "postcss": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "permission": {},
+    "requiredPrivateInfos": ["getPhoneNumber"]
+  }
+}

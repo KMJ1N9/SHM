@@ -8,7 +8,6 @@ const config = require('../config');
 const reportRepo = require('../repository/report');
 const userRepo = require('../repository/user');
 const productRepo = require('../repository/product');
-const creditRepo = require('../repository/credit');
 const {
   notFound, ticketStateInvalid, cannotOperateAdmin,
 } = require('../utils/errors');
@@ -64,29 +63,16 @@ const adminService = {
       throw ticketStateInvalid('仅已受理的工单可裁决');
     }
 
-    const updated = await reportRepo.resolve(ticketId, data.resolution);
+    // 事务内原子操作：工单裁决 + 信誉分扣减 + 变动通知
+    const result = await reportRepo.resolveWithPenalty({
+      ticketId,
+      resolution: data.resolution,
+      reportedUserId: ticket.reported_user_id,
+      deductCredit: data.deduct_credit || 0,
+      creditMax: config.credit.max,
+    });
 
-    // 扣减被举报人信誉分
-    if (data.deduct_credit && data.deduct_credit > 0) {
-      await userRepo.updateCreditScore(
-        ticket.reported_user_id,
-        -data.deduct_credit,
-        config.credit.max
-      );
-
-      // 写入信誉分变动通知
-      const reportedUser = await userRepo.findById(ticket.reported_user_id);
-      await creditRepo.createChangeLog({
-        userId: ticket.reported_user_id,
-        delta: -data.deduct_credit,
-        reason: '举报成立',
-        currentScore: reportedUser.credit_score,
-        previousScore: reportedUser.credit_score + data.deduct_credit,
-        refId: ticketId,
-      });
-    }
-
-    // 记录操作日志
+    // 记录管理员操作日志（非关键路径，事务外执行）
     await reportRepo.createAdminLog({
       admin_id: adminId,
       action: 'resolve_ticket',
@@ -96,7 +82,7 @@ const adminService = {
     });
 
     logger.info('工单裁决', { ticketId, adminId, deductCredit: data.deduct_credit || 0 });
-    return updated;
+    return result.ticket;
   },
 
   /**

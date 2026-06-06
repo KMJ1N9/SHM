@@ -155,19 +155,10 @@ const orderService = {
       const { notOwner } = require('../utils/errors');
       throw notOwner();
     }
-    if (order.status !== 'met') {
-      throw orderStateInvalid('仅已面交状态的订单可确认收货');
-    }
 
-    // 更新订单状态
-    const updatedOrder = await orderRepo.updateStatus(orderId, 'completed', {
-      confirmed_at: new Date(),
-    });
-
-    // 更新商品状态为 sold
-    await productRepo.updateStatus(order.product_id, 'sold');
-
-    return updatedOrder;
+    // 事务内原子操作：订单→completed + 商品→sold
+    // 状态校验 + FOR UPDATE 在 orderRepo.confirmOrder 内部完成
+    return orderRepo.confirmOrder(orderId);
   },
 
   /**
@@ -195,7 +186,7 @@ const orderService = {
       throw notOwner();
     }
 
-    // 确定取消方
+    // 确定取消方（业务逻辑在 service 层）
     let cancelledBy;
     if (order.status === 'pending') {
       cancelledBy = isBuyer ? 'buyer' : 'seller';
@@ -205,12 +196,9 @@ const orderService = {
       throw orderStateInvalid('当前订单状态不可取消');
     }
 
-    const updatedOrder = await orderRepo.updateStatus(orderId, 'cancelled', { cancelled_by: cancelledBy });
-
-    // 恢复商品状态为 active
-    await productRepo.updateStatus(order.product_id, 'active');
-
-    return updatedOrder;
+    // 事务内原子操作：订单→cancelled + 商品→active
+    // 状态二次校验 + FOR UPDATE 在 orderRepo.cancelOrder 内部完成
+    return orderRepo.cancelOrder(orderId, cancelledBy);
   },
 };
 
