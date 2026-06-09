@@ -44,6 +44,18 @@ async function setupTestDb() {
     console.warn('[TEST SETUP] 创建测试数据库失败（可能已存在）:', err.message);
   }
 
+  // 删除所有表（倒序防止外键约束），再执行迁移
+  await db.query('SET FOREIGN_KEY_CHECKS = 0');
+  const tables = [
+    'user_events', 'notifications', 'report_evidence', 'product_images',
+    'admin_logs_archive', 'reviews_archive', 'admin_logs',
+    'reports', 'reviews', 'orders', 'products', 'users',
+  ];
+  for (const table of tables) {
+    await db.query(`DROP TABLE IF EXISTS \`${table}\``);
+  }
+  await db.query('SET FOREIGN_KEY_CHECKS = 1');
+
   // 执行迁移
   const migration = require('../migrations/001_create_tables');
   await migration.up(db);
@@ -74,7 +86,8 @@ async function teardownTestDb() {
  */
 async function createTestUser(overrides = {}) {
   const shortId = Math.random().toString(36).substring(2, 8);
-  const [result] = await db.query(
+  // db.query() 包装了 pool.query：INSERT 返回 ResultSetHeader（不可数组解构）
+  const insertResult = await db.query(
     `INSERT INTO users (phone, nickname, role, status, credit_score)
      VALUES (?, ?, ?, ?, ?)`,
     [
@@ -85,9 +98,10 @@ async function createTestUser(overrides = {}) {
       overrides.credit_score || 100,
     ]
   );
-  const [[user]] = await db.query(
+  // SELECT 返回 rows[]；取第一行即为用户对象
+  const [user] = await db.query(
     'SELECT id, phone, nickname, avatar, class_name, dorm_building, role, status, token_version, credit_score FROM users WHERE id = ?',
-    [result.insertId]
+    [insertResult.insertId]
   );
   return user;
 }

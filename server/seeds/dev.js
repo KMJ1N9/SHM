@@ -53,18 +53,18 @@ async function seed() {
   console.log('插入商品...');
   const products = [];
   const productData = [
-    { seller: users[2], title: '高等数学（第七版）上册', category: '教材教辅', condition: '9成新', original_price: 46.00, price: 20.00, trade_location: '图书馆门口', description: '只用了一学期，几乎没有笔记' },
-    { seller: users[2], title: '机械键盘 IKBC C87', category: '数码电子', condition: '8成新', original_price: 299.00, price: 120.00, trade_location: 'A栋楼下', description: 'Cherry 青轴，键帽有轻微打油' },
+    { seller: users[2], title: '高等数学（第七版）上册', category: '书籍教材', condition: '9成新', original_price: 46.00, price: 20.00, trade_location: '图书馆门口', description: '只用了一学期，几乎没有笔记' },
+    { seller: users[2], title: '机械键盘 IKBC C87', category: '电子产品', condition: '8成新', original_price: 299.00, price: 120.00, trade_location: 'A栋楼下', description: 'Cherry 青轴，键帽有轻微打油' },
     { seller: users[2], title: '台灯 LED 护眼', category: '生活用品', condition: '95新', original_price: 89.00, price: 35.00, trade_location: 'C栋楼下', description: '三档调光，几乎全新' },
-    { seller: users[3], title: '大学英语四级真题（2025版）', category: '教材教辅', condition: '全新', original_price: 59.80, price: 25.00, trade_location: '图书馆门口', description: '买重了，全新未拆封' },
-    { seller: users[3], title: '考研英语词汇红宝书', category: '教材教辅', condition: '7成新及以下', original_price: 68.00, price: 10.00, trade_location: 'D栋楼下', description: '有较多标记，不影响使用' },
+    { seller: users[3], title: '大学英语四级真题（2025版）', category: '书籍教材', condition: '全新', original_price: 59.80, price: 25.00, trade_location: '图书馆门口', description: '买重了，全新未拆封' },
+    { seller: users[3], title: '考研英语词汇红宝书', category: '书籍教材', condition: '7成新及以下', original_price: 68.00, price: 10.00, trade_location: 'D栋楼下', description: '有较多标记，不影响使用' },
     { seller: users[3], title: '床上书桌 折叠款', category: '生活用品', condition: '8成新', original_price: 79.00, price: 30.00, trade_location: 'D栋楼下', description: '折叠方便收纳，桌面有轻微划痕' },
-    { seller: users[4], title: 'iPad Air 4 64G WiFi版', category: '数码电子', condition: '9成新', original_price: 4399.00, price: 2200.00, trade_location: 'E栋楼下', description: '全程贴膜戴壳，无磕碰，电池健康度 92%，带原装充电器' },
-    { seller: users[4], title: 'AirPods Pro 第二代', category: '数码电子', condition: '95新', original_price: 1899.00, price: 950.00, trade_location: 'E栋楼下', description: '使用不到一个月，配件齐全，ANC 降噪正常' },
-    { seller: users[4], title: 'Switch 续航版 红蓝', category: '数码电子', condition: '8成新', original_price: 2099.00, price: 1100.00, trade_location: 'E栋楼下', description: '含底座 + 手柄，屏幕有贴膜，Joy-Con 无漂移' },
+    { seller: users[4], title: 'iPad Air 4 64G WiFi版', category: '电子产品', condition: '9成新', original_price: 4399.00, price: 2200.00, trade_location: 'E栋楼下', description: '全程贴膜戴壳，无磕碰，电池健康度 92%，带原装充电器' },
+    { seller: users[4], title: 'AirPods Pro 第二代', category: '电子产品', condition: '95新', original_price: 1899.00, price: 950.00, trade_location: 'E栋楼下', description: '使用不到一个月，配件齐全，ANC 降噪正常' },
+    { seller: users[4], title: 'Switch 续航版 红蓝', category: '电子产品', condition: '8成新', original_price: 2099.00, price: 1100.00, trade_location: 'E栋楼下', description: '含底座 + 手柄，屏幕有贴膜，Joy-Con 无漂移' },
     { seller: users[2], title: '晾衣架 不锈钢折叠', category: '生活用品', condition: '9成新', original_price: 45.00, price: 18.00, trade_location: 'C栋楼下', description: '不锈钢材质，防锈，展开可晾 20+ 件' },
-    { seller: users[3], title: '素描本 A4 线圈', category: '文具画材', condition: '全新', original_price: 25.00, price: 10.00, trade_location: 'D栋楼下', description: '110g 素描纸，40 张，线圈装订方便撕取' },
-    { seller: users[4], title: '无线鼠标 Logitech G304', category: '数码电子', condition: '8成新', original_price: 199.00, price: 70.00, trade_location: 'E栋楼下', description: 'LIGHTSPEED 无线，电池寿命长，日常使用轻微使用痕迹' },
+    { seller: users[3], title: '素描本 A4 线圈', category: '其他', condition: '全新', original_price: 25.00, price: 10.00, trade_location: 'D栋楼下', description: '110g 素描纸，40 张，线圈装订方便撕取' },
+    { seller: users[4], title: '无线鼠标 Logitech G304', category: '电子产品', condition: '8成新', original_price: 199.00, price: 70.00, trade_location: 'E栋楼下', description: 'LIGHTSPEED 无线，电池寿命长，日常使用轻微使用痕迹' },
   ];
 
   for (const data of productData) {

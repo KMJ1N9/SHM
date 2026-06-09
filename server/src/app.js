@@ -13,6 +13,7 @@
  *   NODE_ENV=production node src/app.js # 生产模式
  */
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -37,6 +38,7 @@ const reportRoutes = require('./routes/report');
 const notificationRoutes = require('./routes/notification');
 const creditRoutes = require('./routes/credit');
 const uploadRoutes = require('./routes/upload');
+const imRoutes = require('./routes/im');
 const adminRoutes = require('./routes/admin');
 
 // ---- 初始化 Express ----
@@ -64,6 +66,25 @@ app.use(requestTimer());
 
 // 访问日志
 app.use(accessLog);
+
+// 静态文件（商品图片等公开资源，不经过 JWT 鉴权）
+//
+// helmet 全局设置了 Cross-Origin-Resource-Policy: same-origin 和
+// Cross-Origin-Opener-Policy: same-origin，会阻止微信小程序 webview
+// 跨域加载图片（小程序 webview 的 origin 与 localhost:3000 不同源）。
+// 此处覆盖为 cross-origin，允许任意来源嵌入图片。
+app.use('/images', (req, res, next) => {
+  // 覆盖 helmet 的 same-origin 限制，允许微信小程序 webview 跨域嵌入图片
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  // CSP: 允许所有来源加载图片（小程序 webview origin 与 API server 不同源）
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src * data:; style-src 'self' 'unsafe-inline'");
+  next();
+});
+
+app.use('/images', express.static(path.join(__dirname, '..', 'public', 'images'), {
+  maxAge: '7d',
+}));
 
 // 全局限流
 app.use('/api', globalLimiter);
@@ -94,6 +115,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/credit', creditRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/im', imRoutes);
 app.use('/api/admin', adminRoutes);
 
 // ============================================================

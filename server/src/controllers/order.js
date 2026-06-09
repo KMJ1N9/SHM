@@ -10,12 +10,12 @@ const orderController = {
    */
   async create(req, res, next) {
     try {
-      const order = await orderService.create(
+      const { order, created } = await orderService.create(
         req.user.id,
         req.user.credit_score,
         req.body
       );
-      res.status(201).json({ code: 0, message: 'ok', data: order });
+      res.status(created ? 201 : 200).json({ code: 0, message: 'ok', data: order });
     } catch (err) {
       next(err);
     }

@@ -9,8 +9,9 @@
  *   5. 将用户信息挂载到 req.user
  *
  * 豁免路径（白名单）：
- *   - POST /api/auth/login   — 登录接口
- *   - GET  /api/health        — 健康检查
+ *   - POST /api/auth/login    — 登录接口
+ *   - POST /api/auth/refresh  — 刷新 Token（从 body 取 refresh_token，不走 Authorization header）
+ *   - GET  /api/health         — 健康检查
  */
 
 const jwt = require('jsonwebtoken');
@@ -21,6 +22,7 @@ const { query } = require('../models/db');
 /** 不需要鉴权的路径白名单（路径相对于挂载点 /api） */
 const EXEMPT_PATHS = [
   { method: 'POST', path: '/auth/login' },
+  { method: 'POST', path: '/auth/refresh' },
   { method: 'GET', path: '/health' },
 ];
 

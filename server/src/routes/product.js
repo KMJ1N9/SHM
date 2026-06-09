@@ -39,7 +39,7 @@ router.post(
     price: Joi.number().required().min(0).precision(2),
     trade_location: Joi.string().required().max(200),
     negotiable: Joi.boolean().optional().default(true),
-    images: Joi.array().items(Joi.string().uri()).max(6).optional(),
+    images: Joi.array().items(Joi.string().uri()).min(1).max(6).required(),
   })),
   productController.create
 );

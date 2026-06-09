@@ -29,6 +29,15 @@ async function generateCredential(userId) {
   const { bucket, region, secretId, secretKey } = config.cos;
   const prefix = `user_${userId}/`;
 
+  // 检测是否需要走服务端上传（而非 COS 直传）
+  //   1. 开发环境始终走服务端上传——本地调试无需 COS 配置，且避免 COS policy
+  //      字段遗漏（如 bucket/Content-Type）导致 403 阻断开发流程
+  //   2. 未配置真实 COS 凭证时（含 "placeholder" 占位字符串）
+  const isMock =
+    config.nodeEnv === 'development' ||
+    bucket.includes('placeholder') ||
+    secretId.includes('placeholder');
+
   // 临时密钥有效期（秒）
   const durationSeconds = 1800;
   const now = Math.floor(Date.now() / 1000);
@@ -39,7 +48,7 @@ async function generateCredential(userId) {
     expiration: new Date((now + durationSeconds) * 1000).toISOString(),
     conditions: [
       { bucket },
-      { 'content-type': config.cos.uploadAllowedTypes },
+      ['starts-with', '$Content-Type', 'image/'],
       ['content-length-range', 1, config.cos.uploadMaxSize],
       ['starts-with', '$key', prefix],
     ],
@@ -52,12 +61,14 @@ async function generateCredential(userId) {
     .digest('base64');
 
   return {
+    mock: isMock,               // 前端据此跳过实际上传（开发环境占位符凭证）
     credentials: {
       tmpSecretId: secretId,
       tmpSecretKey: secretKey,
-      sessionToken: signKey,
+      sessionToken: '',         // 永久密钥鉴权无需 sessionToken（真实 STS 时有值）
       signKey,
     },
+    policy: policyBase64,
     expiredTime,
     prefix,
     bucket,

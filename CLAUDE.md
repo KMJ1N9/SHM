@@ -54,7 +54,7 @@ routes/ → controllers/ → services/ → repository/ → models/
 ```
 
 - **routes/** — 10 个路由模块，只做路由注册和中间件绑定
-- **controllers/** — 8 个控制器，只做参数提取和响应组装，无业务逻辑
+- **controllers/** — 10 个控制器，只做参数提取和响应组装，无业务逻辑
 - **services/** — 12 个服务，所有业务逻辑在此层。含 IM Provider 抽象层（可替换 IM 厂商）
 - **repository/** — 6 个数据访问层，封装 SQL，业务层不接触 SQL。禁止 `SELECT *`
 - **models/** — mysql2/promise 连接池，原生参数化 SQL
@@ -65,7 +65,7 @@ routes/ → controllers/ → services/ → repository/ → models/
 ### uni-app 页面结构（miniprogram/）
 
 ```
-pages/          ← 15 个页面（登录/首页/商品/搜索/聊天/订单/用户/举报/管理/错误）
+pages/          ← 25 个页面（登录/首页/商品/搜索/聊天/订单/用户/举报/管理/错误/互评/通知/设置/关于）
 components/     ← 6 个通用组件（ProductCard/FilterSidebar/ImageUploader/StarRating/AppNavbar/EmptyState）
 api/            ← 6 个接口封装模块（auth/product/order/review/report/admin）
 store/          ← 3 个 Pinia store（user/chat/app）

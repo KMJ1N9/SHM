@@ -80,6 +80,14 @@
       }
     },
     {
+      "path": "pages/review/create",
+      "style": {
+        "navigationBarTitleText": "互评",
+        "navigationBarBackgroundColor": "#4A90D9",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
       "path": "pages/user/me",
       "style": {
         "navigationBarTitleText": "我的",
@@ -120,12 +128,28 @@
       }
     },
     {
+      "path": "pages/user/settings",
+      "style": {
+        "navigationBarTitleText": "系统设置",
+        "navigationBarBackgroundColor": "#4A90D9",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
       "path": "pages/auth/login",
       "style": {
         "navigationBarTitleText": "",
         "navigationBarBackgroundColor": "#FFFFFF",
         "navigationBarTextStyle": "black",
         "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/notification/index",
+      "style": {
+        "navigationBarTitleText": "通知中心",
+        "navigationBarBackgroundColor": "#4A90D9",
+        "navigationBarTextStyle": "white"
       }
     },
     {
@@ -156,6 +180,14 @@
       "path": "pages/admin/tickets",
       "style": {
         "navigationBarTitleText": "工单处理",
+        "navigationBarBackgroundColor": "#4A90D9",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/about/index",
+      "style": {
+        "navigationBarTitleText": "关于我们",
         "navigationBarBackgroundColor": "#4A90D9",
         "navigationBarTextStyle": "white"
       }

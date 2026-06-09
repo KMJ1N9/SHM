@@ -22,7 +22,8 @@ const productController = {
    */
   async detail(req, res, next) {
     try {
-      const product = await productService.detail(parseInt(req.params.id, 10));
+      const viewer = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+      const product = await productService.detail(parseInt(req.params.id, 10), viewer);
       res.json({ code: 0, message: 'ok', data: product });
     } catch (err) {
       next(err);

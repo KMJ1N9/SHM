@@ -9,12 +9,14 @@
 const { Router } = require('express');
 const authController = require('../controllers/auth');
 const { validateBody } = require('../middleware/validate');
+const { sensitiveLimiter } = require('../middleware/rate-limiter');
 const Joi = require('joi');
 
 const router = Router();
 
 router.post(
   '/login',
+  sensitiveLimiter,
   validateBody(Joi.object({
     code: Joi.string().required(),
   })),

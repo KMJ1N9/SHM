@@ -5,13 +5,18 @@ unpackage/
 # 构建产物
 dist/
 *.log
+server/logs/
+error
 
 # 环境配置（含密钥，不入库）
 secret-message
+密钥
 .env.development
+.env.test
 .env.staging
 .env.production
-server/data/
+server/data/*
+!server/data/sensitive-words.txt
 
 # Claude
 .claude/skills/

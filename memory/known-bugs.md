@@ -3,6 +3,7 @@ name: known-bugs
 description: 已知 Bug 列表 — 发现时间、位置、根因、修复方案、修复状态
 metadata:
   type: project
+  updatedAt: 2026-06-08T20:30
 ---
 
 # 已知 Bug
@@ -11,19 +12,323 @@ metadata:
 
 - **发现时间**: 2026-06-05（代码扫描）
 - **修复时间**: 2026-06-06
-- **位置**: [server/src/middleware/auth.js:75](server/src/middleware/auth.js#L75)
-- **严重程度**: P0（导致所有用户鉴权失败——`payload.version` 永远为 `undefined`，永远不等于 `user.token_version`）
-- **根因**: JWT 签发时 payload 字段名为 `tv`（`{ sub, role, tv }`），但中间件验证时读取 `payload.version`，字段名不匹配
-- **修复**: 将 `payload.version` 改为 `payload.tv`（一行改动）
+- **位置**: [server/src/middleware/auth.js](server/src/middleware/auth.js)
+- **严重程度**: P0（所有用户鉴权失败——`payload.version` 永远为 `undefined`）
+- **根因**: JWT 签发时 payload 字段名为 `tv`，中间件验证时读取 `payload.version`
+- **修复**: `payload.version` → `payload.tv`
 
 ## BUG-002: health check 空 catch ✅ 已修复
 
 - **发现时间**: 2026-06-05
 - **修复时间**: 2026-06-06
-- **位置**: [server/src/app.js:82](server/src/app.js#L82)
-- **严重程度**: P2（违反 error-handling-rules 禁止空 catch，数据库故障时无日志排查）
-- **修复**: 添加 `logger.error('健康检查失败', { error: err.message, stack: err.stack })`
+- **位置**: [server/src/app.js](server/src/app.js)
+- **严重程度**: P2（违反 error-handling-rules 禁止空 catch）
+- **修复**: 添加 `logger.error('健康检查失败', { error: err.message })`
 
-**Why:** 代码扫描中发现的实际问题。BUG-001 是致命安全漏洞——token_version 校验完全失效，所有用户登录后立即被判定为 token 不匹配。
+## BUG-003: POST /auth/refresh 未加入鉴权白名单 ✅ 已修复
 
-**How to apply:** 已修复。后续不要再引入类似字段名不一致问题。
+- **发现时间**: 2026-06-07（第 2 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/middleware/auth.js](server/src/middleware/auth.js) — EXEMPT_PATHS
+- **严重程度**: P0（Token 刷新完全不可用——refresh 端点被 JWT 中间件以 1001 拦截）
+- **根因**: `EXEMPT_PATHS` 只含 login 和 health，缺少 refresh。前端 `callRefreshAPI()` 不加 Authorization header（refresh_token 在 body 中），JWT 中间件无 token → 抛 `unauthenticated()` 1001
+- **修复**: 添加 `{ method: 'POST', path: '/auth/refresh' }` 到 EXEMPT_PATHS
+
+## BUG-004: 拦截器自动刷新后 Pinia Store token 未同步 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 2 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [miniprogram/src/store/user.js](miniprogram/src/store/user.js) — initAuth()
+- **严重程度**: P1（Store 与 Storage token 不一致，`isLoggedIn` 可能误判 / 手动 refresh 发送旧 token）
+- **根因**: `api/index.js` 的 `callRefreshAPI()` 只写 Storage，不更新 Pinia store。`initAuth()` 中 getMe 触发自动刷新后，store 仍持有旧 token
+- **修复**: `initAuth()` 中 getMe 成功后从 Storage 重新读取 token 同步回 store
+
+## BUG-005: pool.execute() 不支持参数化 LIMIT/OFFSET ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮编码）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/models/db.js](server/src/models/db.js) — query()
+- **严重程度**: P0（所有带 LIMIT/OFFSET 的查询报 "Incorrect arguments to mysqld_stmt_execute"）
+- **根因**: mysql2 的 `pool.execute()` 使用 MySQL 服务端 PREPARE 协议，LIMIT ? 和 OFFSET ? 的占位符不被服务端支持。而 `pool.query()` 在客户端做参数化转义，功能等价且同样防 SQL 注入。
+- **修复**: `pool.execute(sql, params)` → `pool.query(sql, params)`
+
+## BUG-006: findBySeller() page/pageSize 未解析整数 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮验证）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/repository/product.js](server/src/repository/product.js) — findBySeller()
+- **严重程度**: P1（SQL 错误 "near ''3' OFFSET 0"——pool.query() 将字符串 "3" 引用为 '3' 导致 LIMIT 语法非法）
+- **根因**: req.query 参数均为 string 类型，`pool.query()` 会将字符串参数用引号包裹（LIMIT '3' ≠ LIMIT 3），而 `pool.execute()` 传入时不受影响但对 LIMIT 完全不支持。修复 execute→query 后此问题暴露。
+- **修复**: 添加 `parseInt(rawPage, 10)` 和 `parseInt(rawPageSize, 10)` 整数转换
+
+## BUG-007: chooseAndUpload() 丢弃 ImageUploader 已选文件，用户需选两次图 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [miniprogram/src/utils/cos.js](miniprogram/src/utils/cos.js) — chooseAndUpload() + [miniprogram/src/pages/product/publish.vue](miniprogram/src/pages/product/publish.vue) — nextStep()
+- **严重程度**: P0（用户选图两次，体验严重断裂）
+- **根因**: `chooseAndUpload()` 内部调用 `chooseImages()` → `uni.chooseImage()` 重新打开系统相册，ImageUploader 中已选的 `tempFiles` 仅用于数量校验后被丢弃
+- **修复**: `chooseAndUpload()` 新增可选参数 `preselectedFiles`，传入时跳过 `chooseImages()` 直接上传（仍做格式/大小校验）；publish.vue 传入 `tempFiles.value`
+
+## BUG-008: detail.vue 重试按钮传 event 对象为 id 导致 API 调用失败 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [miniprogram/src/pages/product/detail.vue](miniprogram/src/pages/product/detail.vue) — loadDetail() + template
+- **严重程度**: P0（商品详情加载失败后「重新加载」永远无效——API 请求 `/products/[object Object]`）
+- **根因**: 模板 `@click="loadDetail"` 无参数时 Vue 将原生事件对象作为第一个实参传入，`loadDetail(event)` 中 `id` = `MouseEvent`
+- **修复**: 商品 ID 提升为模块级 `ref`（`currentId`），`loadDetail()` 不再接受参数，从 `currentId.value` 读取
+
+## BUG-009: COS Policy content-type 条件格式非法 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/utils/cos.js](server/src/utils/cos.js) — generateCredential() policy.conditions
+- **严重程度**: P1（COS 可能拒绝所有上传——`{ 'content-type': ['image/jpeg','image/png','image/webp'] }` 数组值永远无法匹配单字符串 Content-Type）
+- **根因**: `config.cos.uploadAllowedTypes` 是 split 后的数组，直接用作 policy exact-match value 语法非法
+- **修复**: 改为 `['starts-with', '$Content-Type', 'image/']`——COS policy 正确的前缀匹配格式
+
+## BUG-010: x-cos-security-token 错误传 HMAC 签名值 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/utils/cos.js](server/src/utils/cos.js) — sessionToken + [miniprogram/src/utils/cos.js](miniprogram/src/utils/cos.js) — uploadOne() formData
+- **严重程度**: P1（永久密钥鉴权不应传 x-cos-security-token，传 HMAC 签名值可能被 COS 拒绝）
+- **根因**: 后端 `sessionToken: signKey` 将 HMAC-SHA1 签名误标为 sessionToken；前端无条件将此值作为 `x-cos-security-token` 发送
+- **修复**: 后端 sessionToken 改为空字符串（注释标注用途）；前端条件判断 `if (credentials.sessionToken)` 才附加此字段
+
+## BUG-011: db.js 注释仍描述 pool.execute() ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/models/db.js](server/src/models/db.js) — JSDoc 注释
+- **严重程度**: P2（文档与实现不一致，可能误导后续开发者）
+- **根因**: `pool.execute()` 切换为 `pool.query()` 后，注释未同步更新
+- **修复**: 第 6 行和第 36-37 行注释中 `pool.execute` → `pool.query`，`PREPARE + EXECUTE 协议` → `客户端参数化转义`
+
+## BUG-012: create()/update() 返回值未嵌套 seller ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/services/product.js](server/src/services/product.js) — create() + update()
+- **严重程度**: P2（API 响应格式不一致——list/detail 返回嵌套 seller，create/update 返回扁平字段）
+- **根因**: create/update 直接返回 repo 结果，未经过 nestSeller() 转换
+- **修复**: create() 和 update() 返回值通过 `nestSeller()` 包装后再返回
+
+## BUG-013: ProductCard 占位图空 base64 data URI ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮审查）
+- **修复时间**: 2026-06-07
+- **位置**: [miniprogram/src/components/ProductCard.vue](miniprogram/src/components/ProductCard.vue) — placeholderImage
+- **严重程度**: P2（`data:image/svg+xml;base64,` 无实际 SVG 内容，渲染为破损图片图标）
+- **根因**: 占位图 base64 字符串为空，缺少 SVG 负载
+- **修复**: 替换为完整的灰色 SVG data URI（200×200 `#F0F0F0` 矩形，与 $color-divider 背景一致）
+
+## BUG-014: 渲染层加载 example.com 图片报 ERR_BLOCKED_BY_RESPONSE 🔴 待修复
+
+- **发现时间**: 2026-06-07
+- **位置**: 微信开发者工具渲染层
+- **严重程度**: P2（不影响功能——代码和数据库均无 example.com 引用，图片已使用 SVG data URI 占位图；怀疑为微信开发者工具缓存旧编译产物）
+- **根因**: 未确定。已排查：全代码库 `grep -r "example.com"` 零匹配、MySQL 全库零匹配、dist/ 目录已删除重建。IP 104.20.23.154 归属 Cloudflare，推测为微信开发者工具内部缓存或旧版编译产物残留
+- **修复方案**: 待深入排查微信开发者工具缓存机制，必要时清除工具级缓存或重装开发者工具
+- **相关记忆**: [[project-state]]
+
+## BUG-015: detail.vue 卖家默认头像 data URI 为空 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [miniprogram/src/pages/product/detail.vue:153](miniprogram/src/pages/product/detail.vue#L153)
+- **严重程度**: P1（所有无头像卖家的商品详情页显示破损图片图标——与 BUG-013 同类缺陷）
+- **根因**: `defaultAvatar = 'data:image/svg+xml;base64,'` — base64 内容为空。BUG-013 修复了 ProductCard 占位图但遗漏了 detail.vue
+- **修复方案**: 替换为完整灰色 SVG data URI（圆形头像，100×100 `#F0F0F0` 背景），与 ProductCard BUG-013 修复模式一致
+
+## BUG-016: update() 未禁止编辑已删除商品 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/services/product.js:176](server/src/services/product.js#L176)
+- **严重程度**: P1（已软删除的商品仍可被直接 API 调用编辑——状态守卫只拦截 sold/frozen，遗漏 deleted）
+- **根因**: 条件 `product.status === 'sold' || product.status === 'frozen'` 未包含 `deleted`
+- **修复方案**: 扩展条件为 `['sold', 'frozen', 'deleted'].includes(product.status)`
+
+## BUG-017: services/product.js list() 中 isNaN 校验为死代码 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/services/product.js:75-77](server/src/services/product.js#L75-L77)
+- **严重程度**: P2（page/pageSize 经过 `parseInt || 1` + `Math.max(1, ...)` 后永不为 NaN）
+- **修复方案**: 删除 3 行死代码，同步移除 import 中未使用的 `invalidPagination`
+
+## BUG-018: delete() 存在 TOCTOU 竞态条件 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/services/product.js:208-221](server/src/services/product.js#L208-L221) + [server/src/repository/product.js:103-120](server/src/repository/product.js#L103-L120) + [server/src/repository/product.js:180-187](server/src/repository/product.js#L180-L187)
+- **严重程度**: P2（findById 和 updateStatus 之间无事务保护，并发场景下状态校验可能被绕过）
+- **修复方案**: `delete()` 使用 `db.transaction()` 包裹；`findById(id, conn)` 和 `updateStatus(id, status, conn)` 新增可选 `conn` 参数——传入时使用事务连接 + `SELECT ... FOR UPDATE` 锁定行
+
+## P2-1: 后端缺少 price ≤ original_price 校验 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/services/product.js:127-130](server/src/services/product.js#L127-L130) (create) + [server/src/services/product.js:182-189](server/src/services/product.js#L182-L189) (update)
+- **严重程度**: P2（前端校验可被绕过 API 直接调用，售价高于原价的商品可入库）
+- **根因**: create() 和 update() 均未校验 price ≤ original_price
+- **修复方案**: create() 直接比较两字段；update() 使用 effective 值（未传字段沿用 product 旧值）处理部分更新场景
+
+## P2-2: findBySeller() API 响应无 seller 嵌套 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/services/product.js:245-254](server/src/services/product.js#L245-L254)
+- **严重程度**: P2（GET /products 返回嵌套 seller 对象，GET /products/my 返回扁平 seller_id，格式不一致）
+- **修复方案**: findBySeller() 返回前对每行添加 `seller: null` 和 `cover_image` 字段，保持与 list() 结构一致
+
+## P2-3: ImageUploader 单文件失败丢弃全部 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [miniprogram/src/components/ImageUploader.vue:92-107](miniprogram/src/components/ImageUploader.vue#L92-L107)
+- **严重程度**: P2（用户选 3 张 JPG + 1 张 BMP → 全部丢弃，而非仅过滤 BMP）
+- **修复方案**: 改为 filter 过滤合法文件（格式+大小），仅 rejected > 0 时 toast 提示已自动过滤，valid 为空时才提前 return
+
+## P2-4: index.vue noMore 判断逻辑改用返回条数 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [miniprogram/src/pages/index/index.vue:131-134](miniprogram/src/pages/index/index.vue#L131-L134)
+- **严重程度**: P2（`list.length >= total` 依赖 total 准确性，与 my.vue 的 `data.list.length < pageSize` 方式不一致）
+- **修复方案**: 统一为 `(data.list || []).length < pageSize` 判断，与 my.vue 保持一致
+
+## P2-5: db.js JSDoc 建议 conn.execute() 错误 ✅ 已修复
+
+- **发现时间**: 2026-06-07（第 3 轮全面审计）
+- **修复时间**: 2026-06-07
+- **位置**: [server/src/models/db.js:91](server/src/models/db.js#L91)
+- **严重程度**: P2（注释与 BUG-005 修复后的实现不一致，事务内使用 conn.execute() 会有相同 LIMIT/OFFSET PREPARE 限制）
+- **修复方案**: JSDoc 更新为 `conn.query()`，注明与 pool.query() 一致、支持 LIMIT/OFFSET
+
+## BUG-019: productRepo.findById() 返回数组而非对象 ✅ 已修复
+
+- **发现时间**: 2026-06-08
+- **修复时间**: 2026-06-08
+- **位置**: [server/src/repository/product.js:107](server/src/repository/product.js#L107) — findById()
+- **严重程度**: P0（详情页全部数据异常：价格=0、交易信息空白、图片黑屏、无控制台报错）
+- **根因**: `findById()` 调用 `db.query()`（即 `pool.query()`），mysql2 返回 `[rows, fields]` 元组。代码写 `const [row] = await db.query(...)` 将整个 rows 数组解构为 `row`，`return row || null` 返回的是数组而非对象。这与 `db.js` 的 `query()` helper 不同——helper 内部已解构 `const [rows] = await pool.query(...); return rows;`，而 `findById` 直接调用 `pool.query()` 跳过了这层解构。
+- **影响链**: `nestSeller(数组)` → 数组无 `seller_nickname` 属性 → 返回原数组 → 前端 `product.value = [{...}]` → `product.images` 为 undefined → swiper 空渲染 → 纯黑背景 / `product.price` 为 undefined → `formatPrice(undefined)` → 显示 0
+- **修复**: `const [rows] = await db.query(...)` → `return rows[0] || null`
+
+## BUG-020: helmet CORP/CSP 阻止微信小程序加载本地图片 ✅ 已修复
+
+- **发现时间**: 2026-06-08
+- **修复时间**: 2026-06-08
+- **位置**: [server/src/app.js:75-83](server/src/app.js#L75-L83)
+- **严重程度**: P0（所有商品图片在微信小程序中不显示，首页+详情页均黑屏；curl 可正常访问图片，非存储桶权限问题）
+- **根因**: `helmet()` 全局设置 `Cross-Origin-Resource-Policy: same-origin` + `Cross-Origin-Opener-Policy: same-origin` + CSP `img-src 'self'`。微信小程序运行在 DevTools webview（origin 如 `http://127.0.0.1:XXXXX`），与 Express 服务器（`http://localhost:3000`）不同源。浏览器/CORP 检查拒绝跨域加载图片。
+- **说明**: 开发环境使用占位符 COS 凭证（`COS_BUCKET=shm-dev-placeholder`），图片上传到本地 `server/public/images/` 而非腾讯云 COS。COS 存储桶无数据是预期行为，非 bug。
+- **修复**: 在 `express.static('/images')` 前新增中间件，覆盖 helmet 头——CORP → `cross-origin`、移除 COEP、CSP `img-src` → `*`
+
+**Why:** BUG-001~020 + P2-1~P2-5 全部已修复 ✅。BUG-014 为顽固缓存问题待处理。第 3 轮代码质量综合评分从 8.5 → 9.0/10。
+
+## BUG-021: 首页筛选侧边栏分类筛选无效 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 4 轮微信开发者工具测试）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/index/index.vue:170-172](miniprogram/src/pages/index/index.vue#L170-L172) — loadProducts()
+- **严重程度**: P1（侧边栏选分类后 API 请求不带 category 参数，筛选无效；成色和价格正常）
+- **根因**: `loadProducts()` 仅从 `activeCategory.value`（顶部 Tab）读取分类，完全忽略 `filters.category`（侧边栏）。`onFilterApply()` 将分类写入 `filters.category`，但 API 参数构建时只检查 `activeCategory.value`。
+- **修复**: 合并两个来源 — `const category = filters.category || activeCategory.value`，侧边栏优先，回退到顶部 Tab。
+- **影响范围**: 仅首页筛选。搜索页的筛选正常工作（搜索页无顶部 Tab，直接使用 `filters.category`）。
+
+## BUG-022: 搜索结果翻页请求失败时跳过一整页数据 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 4 轮全面审计）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/search/index.vue:416](miniprogram/src/pages/search/index.vue#L416) — onReachBottom + loadProducts()；同模式存在于 [miniprogram/src/pages/index/index.vue:246](miniprogram/src/pages/index/index.vue#L246)
+- **严重程度**: P1（翻页 API 失败后，页码已递增但数据未加载，导致该页数据永久跳过；用户看到的症状是"少了一页结果"）
+- **根因**: `onReachBottom` 中 `page.value++` 在 `loadProducts(false)` 之前执行。API 请求失败时 page 已加 1 但数据未获取，下次触底再次 +1，跳过失败页。
+- **修复**: `loadProducts()` 内部用局部变量 `targetPage = reset ? 1 : page.value + 1` 计算目标页码，API 成功后才 `page.value = targetPage`。`onReachBottom` 不再手动递增 page。
+- **影响范围**: 搜索页和首页的瀑布流翻页。修复后页码推进与网络成败绑定。
+
+**Why:** BUG-001~020 + P2-1~P2-5 + BUG-021~022 全部已修复 ✅。BUG-014 为顽固缓存问题待处理。
+
+## A5-001: 发送消息失败后用户输入永久丢失 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 5 轮全面审计）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/chat/detail.vue:312-313](miniprogram/src/pages/chat/detail.vue#L312-L313) — sendMessage()
+- **严重程度**: P1（用户输入长文本 → 发送失败 → 输入框已空 → 消息永久丢失）
+- **根因**: `inputText.value = ''` 在 `await sendTextMessage()` 之前执行。发送失败时用户输入已清空。
+- **修复**: 将 `inputText.value = ''` 移到 `await sendTextMessage()` 成功之后。
+
+## A5-002: 聊天页面隐藏时仍处理新消息并标记已读 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 5 轮全面审计）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/chat/detail.vue:335-355](miniprogram/src/pages/chat/detail.vue#L335-L355) — registerMessageListener()
+- **严重程度**: P1（用户导航到其他页面时，聊天页 MESSAGE_RECEIVED 监听器仍在运行，静默标记消息为已读；用户返回后错过重要消息）
+- **修复**: 新增 `isPageVisible` ref + `onHide`/`onShow` 生命周期 + `loadLatestMessages()` 补充加载。监听器中检查 `isPageVisible` 决定是否处理。
+- **验证**: `npx vitest run` — 7 文件 106 用例全部通过。
+
+## A5-004: CONVERSATION_UPDATE 事件兜底字符串无效 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 5 轮全面审计）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/chat/list.vue:273](miniprogram/src/pages/chat/list.vue#L273)
+- **严重程度**: P2（`tim.EVENT?.CONVERSATION_UPDATE || 'conversation-updated'` — 兜底字符串不是有效 IM 事件名）
+- **修复**: 导入 `TIM from 'tim-wx-sdk'`，直接使用 `TIM.EVENT.CONVERSATION_UPDATE`。
+
+## A5-005: onTapConversation 乐观清零 unreadCount ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 5 轮全面审计）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/chat/list.vue:224-225](miniprogram/src/pages/chat/list.vue#L224-L225)
+- **严重程度**: P2（`setMessageRead` 失败时 UI 已清零，短暂不一致 → `onShow` 加载会话列表可自愈）
+- **修复**: 保存 `prevCount`，`.catch()` 中恢复。
+
+## A5-006: hasMore 用 length >= 20 判断不精确 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 5 轮全面审计）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/notification/index.vue:160](miniprogram/src/pages/notification/index.vue#L160) — loadNotifications() + loadMore()
+- **严重程度**: P2（末页恰好 20 条时多一次空请求）
+- **修复**: 改用 `notifications.value.length < (result.total || 0)` 精确判断。
+
+## A5-007/A5-008/A5-009: 三处空 catch 合规修复 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 5 轮全面审计）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/pages/notification/index.vue:238](miniprogram/src/pages/notification/index.vue#L238) / [App.vue:131](miniprogram/src/App.vue#L131) / [chat/detail.vue:464](miniprogram/src/pages/chat/detail.vue#L464)
+- **严重程度**: P2（违反 `rules/error-handling-rules` 禁止空 catch）
+- **修复**: 三处分别添加 `console.warn` / `console.debug` 日志输出。
+
+**Why:** 第 5 轮审计发现 P1×2 + P2×7，全部于 2026-06-08 修复。修复后测试 7 文件 106 用例全过，ESLint 0 错误。评分从 8.5 回升至 9.0/10。
+
+## BUG-023: UserSig 中 `userId.length` 为 `undefined` 导致 IM 登录失败 ✅ 已修复
+
+- **发现时间**: 2026-06-08（第 5 轮微信开发者工具测试 — 点击"聊一聊"提示"消息服务连接中"）
+- **修复时间**: 2026-06-08
+- **位置**: [server/src/utils/im-api.js:54](server/src/utils/im-api.js#L54) — generateUserSig() return 语句
+- **严重程度**: P0（UserSig 包含 `undefined` 字符串，腾讯云 IM SDK 校验失败 → IM 永远无法登录 → 所有聊天功能不可用）
+- **根因**: `userId` 来自数据库 `user.id`（INT 类型），Number 没有 `.length` 属性 → `userId.length` = `undefined`。UserSig 模板为 `...2.${userId.length}.${userId}...`，拼接后为 `...2.undefined.1...`，腾讯云 IM 服务端拒绝该签名。
+- **修复**: `generateUserSig()` 顶部添加 `const userIdStr = String(userId)`，将所有 `userId` 引用替换为 `userIdStr`（含 JSON 中的 `TLS.identifier` 和 return 字符串中的 `userIdStr.length` + `userIdStr`）
+- **影响范围**: GET /api/im/user-sig — 所有已登录用户调用此接口获取的 UserSig 均受影响
+
+## BUG-024: `initIM()` 登录响应格式判断错误 — 首次登录误判为失败 🔴 已修复
+
+- **发现时间**: 2026-06-08（BUG-023 修复后"聊一聊"仍不可用 → 深入分析 TIM SDK 源码）
+- **修复时间**: 2026-06-08
+- **位置**: [miniprogram/src/utils/im.js:184](miniprogram/src/utils/im.js#L184) — initIM() 登录成功判断
+- **严重程度**: P0（首次/冷启动登录永远被误判为失败 → 触发重试 → 依赖 SDK_READY 事件副作用偶然兜底 → 用户体验"消息服务连接中"）
+- **根因**: TIM SDK (tim-wx-sdk v2.27.6) `login()` 方法对首次登录和重复登录返回**不同响应格式**：
+  - **首次登录**：返回 wslogin 协议原始响应 `{ data: { a2Key, tinyID, helloInterval, instanceID, timeStamp } }` — **无 `actionStatus` 字段**。SDK 在同一个 `Promise.then()` 回调中调用 `triggerReady()` → 触发 `SDK_READY` 事件 → `isReady = true`
+  - **重复登录**（已在线）：返回 `{ data: { actionStatus: 'OK', repeatLogin: true } }` — **有 `actionStatus`**
+  - 代码 `loginRes?.data?.actionStatus === 'OK'` 对首次登录判断为 `undefined === 'OK'` → `false` → 抛出 `new Error('登录失败')`，即使登录实际已成功
+  - 重试机制偶然兜底：第一次失败后 2s 重试 → `isReady` 已被 `SDK_READY` 设为 `true` → `if (isReady) return` 立即返回。但如果 SDK_READY 未及时触发或网络波动导致 3 次重试耗尽，则 IM 永久不可用
+- **修复**（3 处改动）:
+  1. [utils/im.js:184](miniprogram/src/utils/im.js#L184) — 重写成功判断链：**①`isReady`**（SDK_READY 已触发）→ ②`actionStatus === 'OK'`（重复登录）→ ③`getMyStatus() === 'ok'`（状态检测）→ ④显式 errorCode → ⑤未知错误；catch 块中若 `isReady` 已为 true 直接返回成功
+  2. [detail.vue:342-346](miniprogram/src/pages/product/detail.vue#L342-L346) — `goChat()` 改为 `async`，使用 `waitForReady(8000)` 等待 IM 就绪，处理用户快速点击时 IM 仍在初始化的情况
+  3. [App.vue:54-56](miniprogram/src/App.vue#L54-L56) — IM 最终初始化失败时显示 toast 提示用户重启，不再静默吞错
+- **验证**: 后端 7 文件 106 用例全过、前端构建成功、UserSig 格式正确无 `undefined`
+
+**How to apply:** 发现新 Bug 时按此格式追加。修复后标记 ✅ 并记录修复方案。详见 [[iteration3-audit]] [[iteration4-audit]] [[iteration5-audit]]。

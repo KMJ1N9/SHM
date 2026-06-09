@@ -16,6 +16,8 @@ const cron = require('node-cron');
 const config = require('./src/config');
 const logger = require('./src/utils/logger');
 const db = require('./src/models/db');
+const imProvider = require('./src/services/im/provider');
+const userRepo = require('./src/repository/user');
 
 // ============================================================
 // 工具函数
@@ -66,6 +68,27 @@ async function cancelTimeoutOrders() {
         AND o.updated_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
     `;
     await db.pool.execute(restoreSql);
+
+    // IM 通知买卖双方：订单超时自动取消
+    const [cancelledOrders] = await db.pool.execute(
+      `SELECT o.id, o.buyer_id, o.seller_id, o.product_snapshot
+       FROM orders o
+       WHERE o.status = 'cancelled'
+         AND o.cancelled_by = 'system'
+         AND o.updated_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)`
+    );
+    for (const order of cancelledOrders) {
+      const title = (order.product_snapshot && order.product_snapshot.title)
+        ? order.product_snapshot.title
+        : '商品';
+      const msg = {
+        title: '订单超时自动取消',
+        content: `「${title}」的订单超过 24 小时未面交，系统已自动取消`,
+        extra: { type: 'order', order_id: order.id, status: 'cancelled' },
+      };
+      imProvider.sendSystemMessage(order.buyer_id, msg).catch(() => {});
+      imProvider.sendSystemMessage(order.seller_id, msg).catch(() => {});
+    }
   }
 }
 
@@ -83,6 +106,34 @@ async function confirmTimeoutOrders() {
   const [result] = await db.pool.execute(sql);
   if (result.affectedRows > 0) {
     logger.info(`[CRON] 自动确认 ${result.affectedRows} 笔超时订单`);
+
+    // 查询本次自动确认的订单详情
+    const [completedOrders] = await db.pool.execute(
+      `SELECT o.id, o.buyer_id, o.seller_id, o.product_snapshot
+       FROM orders o
+       WHERE o.status = 'completed'
+         AND o.confirmed_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)`
+    );
+    for (const order of completedOrders) {
+      // 卖家信誉分 +2
+      userRepo.updateCreditScore(
+        order.seller_id,
+        config.credit.rewardTransaction,
+        config.credit.max
+      ).catch(() => {});
+
+      // IM 通知双方互评
+      const title = (order.product_snapshot && order.product_snapshot.title)
+        ? order.product_snapshot.title
+        : '商品';
+      const msg = {
+        title: '订单超时自动确认',
+        content: `「${title}」的订单已超过 72 小时未确认收货，系统已自动完成`,
+        extra: { type: 'review_remind', order_id: order.id },
+      };
+      imProvider.sendSystemMessage(order.buyer_id, msg).catch(() => {});
+      imProvider.sendSystemMessage(order.seller_id, msg).catch(() => {});
+    }
   }
 }
 

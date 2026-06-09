@@ -15,6 +15,9 @@
 const config = require('../config');
 const orderRepo = require('../repository/order');
 const productRepo = require('../repository/product');
+const userRepo = require('../repository/user');
+const imProvider = require('./im/provider');
+const logger = require('../utils/logger').business;
 const {
   notFound, invalidStatus, orderStateInvalid, productLocked,
   cannotBuyOwn, creditTooLowTrade,
@@ -38,7 +41,7 @@ const orderService = {
     const idempotentKey = `${buyerId}_${data.product_id}`;
     const existing = await orderRepo.findByIdempotentKey(idempotentKey);
     if (existing) {
-      return existing;
+      return { order: existing, created: false };
     }
 
     // 查询商品信息
@@ -77,7 +80,14 @@ const orderService = {
       product_snapshot: productSnapshot,
     });
 
-    return order;
+    // IM 通知卖家：有人想要购买
+    imProvider.sendSystemMessage(product.seller_id, {
+      title: '有人想要购买你的商品',
+      content: `用户已对「${product.title}」发起交易，请查看订单详情`,
+      extra: { type: 'order', order_id: order.id, product_id: data.product_id },
+    }).catch(err => logger.warn('IM 通知卖家失败', { orderId: order.id, error: err.message }));
+
+    return { order, created: true };
   },
 
   /**
@@ -133,7 +143,17 @@ const orderService = {
       throw orderStateInvalid('仅待面交状态的订单可标记面交');
     }
 
-    return orderRepo.updateStatus(orderId, 'met', { met_at: new Date() });
+    const updated = await orderRepo.updateStatus(orderId, 'met', { met_at: new Date() });
+
+    // IM 通知对方：已确认面交
+    const notifyUserId = order.buyer_id === userId ? order.seller_id : order.buyer_id;
+    imProvider.sendSystemMessage(notifyUserId, {
+      title: '对方已确认面交',
+      content: '请尽快确认收货',
+      extra: { type: 'order', order_id: orderId },
+    }).catch(err => logger.warn('IM 通知面交失败', { orderId, error: err.message }));
+
+    return updated;
   },
 
   /**
@@ -158,7 +178,25 @@ const orderService = {
 
     // 事务内原子操作：订单→completed + 商品→sold
     // 状态校验 + FOR UPDATE 在 orderRepo.confirmOrder 内部完成
-    return orderRepo.confirmOrder(orderId);
+    const confirmed = await orderRepo.confirmOrder(orderId);
+
+    // 卖家信誉分 +2
+    const sellerId = order.seller_id;
+    userRepo.updateCreditScore(sellerId, config.credit.rewardTransaction, config.credit.max)
+      .catch(err => logger.warn('信誉分更新失败', { orderId, sellerId, error: err.message }));
+
+    // IM 通知买卖双方互评
+    const reviewMsg = {
+      title: '订单已完成',
+      content: '买家已确认收货，请互相评价',
+      extra: { type: 'review_remind', order_id: orderId },
+    };
+    imProvider.sendSystemMessage(order.buyer_id, reviewMsg)
+      .catch(err => logger.warn('IM 通知买家互评失败', { orderId, error: err.message }));
+    imProvider.sendSystemMessage(sellerId, reviewMsg)
+      .catch(err => logger.warn('IM 通知卖家互评失败', { orderId, error: err.message }));
+
+    return confirmed;
   },
 
   /**
@@ -198,7 +236,17 @@ const orderService = {
 
     // 事务内原子操作：订单→cancelled + 商品→active
     // 状态二次校验 + FOR UPDATE 在 orderRepo.cancelOrder 内部完成
-    return orderRepo.cancelOrder(orderId, cancelledBy);
+    const cancelled = await orderRepo.cancelOrder(orderId, cancelledBy);
+
+    // IM 通知对方：订单已取消
+    const notifyUserId = cancelledBy === 'buyer' ? order.seller_id : order.buyer_id;
+    imProvider.sendSystemMessage(notifyUserId, {
+      title: '订单已取消',
+      content: `订单已被${cancelledBy === 'buyer' ? '买家' : '卖家'}取消`,
+      extra: { type: 'order', order_id: orderId, status: 'cancelled' },
+    }).catch(err => logger.warn('IM 通知取消失败', { orderId, error: err.message }));
+
+    return cancelled;
   },
 };
 

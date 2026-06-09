@@ -7,6 +7,10 @@ module.exports = {
     es2021: true,
     node: true,
   },
+  globals: {
+    uni: 'readonly',
+    getCurrentPages: 'readonly',
+  },
   extends: [
     'eslint:recommended',
     'plugin:vue/vue3-recommended',

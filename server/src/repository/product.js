@@ -4,7 +4,7 @@
  * 封装所有 products 表 + product_images 表的 SQL 操作。
  */
 
-const { query, transaction } = require('../models/db');
+const { query, pool, transaction } = require('../models/db');
 
 const PRODUCT_FIELDS = [
   'id', 'seller_id', 'title', 'description', 'category', '`condition`',
@@ -39,8 +39,10 @@ const productRepo = {
 
     // 关键词搜索（FULLTEXT 优先，LIKE 兜底）
     if (keyword) {
-      conditions.push('(MATCH(p.title, p.description) AGAINST(? IN BOOLEAN MODE) OR p.title LIKE ?)');
-      params.push(keyword, `%${keyword}%`);
+      conditions.push(
+        '(MATCH(p.title, p.description) AGAINST(? IN BOOLEAN MODE) OR p.title LIKE ? OR u.nickname LIKE ? OR p.category LIKE ?)'
+      );
+      params.push(keyword, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
     }
     if (category) {
       conditions.push('p.category = ?');
@@ -69,9 +71,9 @@ const productRepo = {
       default:          orderBy = 'ORDER BY p.created_at DESC'; break;
     }
 
-    // 计数
+    // 计数（需要 JOIN users 因为 WHERE 可能引用 u.nickname）
     const [countResult] = await query(
-      `SELECT COUNT(*) AS total FROM products p ${where}`,
+      `SELECT COUNT(*) AS total FROM products p JOIN users u ON p.seller_id = u.id ${where}`,
       params
     );
 
@@ -97,10 +99,14 @@ const productRepo = {
   /**
    * 商品详情（含卖家公开信息）
    * @param {number} id
+   * @param {import('mysql2/promise').PoolConnection} [conn] - 事务连接（传入时自动加 FOR UPDATE 行锁）
    * @returns {Promise<Object|null>}
    */
-  async findById(id) {
-    const [row] = await query(
+  async findById(id, conn) {
+    const db = conn || pool;
+    // 事务内查询加行锁，防止 TOCTOU 竞态
+    const forUpdate = conn ? ' FOR UPDATE' : '';
+    const [rows] = await db.query(
       `SELECT p.id, p.seller_id, p.title, p.description, p.category, p.\`condition\`,
               p.original_price, p.price, p.trade_location, p.negotiable, p.images,
               p.status, p.created_at, p.updated_at,
@@ -109,10 +115,11 @@ const productRepo = {
               u.credit_score AS seller_credit_score
        FROM products p
        JOIN users u ON p.seller_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.id = ?${forUpdate}`,
       [id]
     );
-    return row || null;
+    // db.query() returns [rows, fields]; extract first row (or null if not found)
+    return rows[0] || null;
   },
 
   /**
@@ -170,14 +177,16 @@ const productRepo = {
    * 更新商品状态
    * @param {number} id
    * @param {string} status
+   * @param {import('mysql2/promise').PoolConnection} [conn] - 事务连接
    * @returns {Promise<Object>}
    */
-  async updateStatus(id, status) {
-    await query(
+  async updateStatus(id, status, conn) {
+    const db = conn || pool;
+    await db.query(
       'UPDATE products SET status = ? WHERE id = ?',
       [status, id]
     );
-    return this.findById(id);
+    return this.findById(id, conn);
   },
 
   /**
@@ -187,7 +196,10 @@ const productRepo = {
    * @returns {Promise<{list: Array, total: number}>}
    */
   async findBySeller(sellerId, filters = {}) {
-    const { status = 'all', page = 1, pageSize = 20 } = filters;
+    const { status = 'all', page: rawPage, pageSize: rawPageSize } = filters;
+    // 强制整数解析（query string 参数均为 string 类型，LIMIT/OFFSET 需要整数）
+    const page = Math.max(1, parseInt(rawPage, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(rawPageSize, 10) || 20));
     const conditions = ['seller_id = ?'];
     const params = [sellerId];
 

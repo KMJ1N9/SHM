@@ -14,6 +14,8 @@ module.exports = defineConfig({
     environment: 'node',
     include: ['__tests__/**/*.test.js'],
     testTimeout: 10000,
+    // 测试文件顺序执行（共享同一测试数据库，并行会导致 DDL 冲突）
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

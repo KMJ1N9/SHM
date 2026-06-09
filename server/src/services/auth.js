@@ -69,9 +69,11 @@ const authService = {
     }
 
     // 查找或创建用户
+    let isNewUser = false;
     let user = await userRepo.findByPhone(phone);
     if (!user) {
       user = await userRepo.create({ phone, nickname: '微信用户' });
+      isNewUser = true;
       logger.info('新用户注册', { userId: user.id, phone });
     }
 
@@ -87,6 +89,7 @@ const authService = {
     return {
       accessToken,
       refreshToken,
+      isNewUser,
       user: {
         id: user.id,
         phone: user.phone,

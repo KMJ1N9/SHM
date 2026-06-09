@@ -11,10 +11,12 @@
       "urlCheck": false,
       "es6": true,
       "postcss": true,
-      "minified": true
+      "minified": true,
+      "ignoreDevUnusedFiles": false,
+      "initialRenderingCache": false
     },
     "usingComponents": true,
     "permission": {},
-    "requiredPrivateInfos": ["getPhoneNumber"]
+    "requiredPrivateInfos": []
   }
 }

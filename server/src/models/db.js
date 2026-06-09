@@ -3,7 +3,7 @@
  *
  * 使用 mysql2/promise，提供：
  *   - pool:  连接池实例（供 repository 层获取事务连接）
- *   - query: 便捷查询函数（内部调用 pool.execute，参数化查询防 SQL 注入）
+ *   - query: 便捷查询函数（内部调用 pool.query，参数化查询防 SQL 注入）
  *   - transaction: 事务包装器
  *
  * 慢查询告警（见技术架构文档 §2.8）：
@@ -33,7 +33,7 @@ pool
 /**
  * 执行参数化查询（便捷函数）
  *
- * 内部调用 pool.execute(sql, params)，使用 PREPARE + EXECUTE 协议，
+ * 内部调用 pool.query(sql, params)，客户端参数化转义，
  * 天然防 SQL 注入。禁止传入拼接字符串的 SQL。
  *
  * 内置慢查询监控：
@@ -47,7 +47,11 @@ pool
 async function query(sql, params = []) {
   const start = Date.now();
   try {
-    const [rows] = await pool.execute(sql, params);
+    // 使用 pool.query() 而非 pool.execute()：
+    // execute() 使用 MySQL 服务端 PREPARE 协议，LIMIT/OFFSET 的
+    // 参数化占位符不被支持（Incorrect arguments to mysqld_stmt_execute）。
+    // query() 在客户端做参数化转义，功能等价且同样防 SQL 注入。
+    const [rows] = await pool.query(sql, params);
     const duration = Date.now() - start;
 
     if (duration > 1000) {
@@ -84,7 +88,7 @@ async function query(sql, params = []) {
  * 事务包装器
  *
  * 获取连接 → 开启事务 → 执行业务回调 → 提交/回滚 → 释放连接。
- * 回调函数接收 connection 参数，在事务内执行的查询应使用 conn.execute()。
+ * 回调函数接收 connection 参数，在事务内执行的查询应使用 conn.query()（与 pool.query() 一致，客户端参数化转义，支持 LIMIT/OFFSET）。
  *
  * @param {Function} callback - async (conn) => result
  * @returns {Promise<*>} 回调函数的返回值

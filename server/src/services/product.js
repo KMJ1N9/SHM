@@ -5,13 +5,63 @@
  */
 
 const config = require('../config');
+const db = require('../models/db');
 const productRepo = require('../repository/product');
+const sensitiveFilter = require('../utils/sensitive-filter');
 const {
-  notFound, invalidStatus, creditTooLowPublish, invalidPagination,
+  notFound, invalidStatus, creditTooLowPublish, badRequest,
 } = require('../utils/errors');
 
 const MAX_IMAGES = 6;
 const MAX_PAGE_SIZE = 50;
+
+/**
+ * 从 images JSON 数组提取第一张作为封面
+ * @param {string|Array} images - JSON string or parsed array
+ * @returns {string|null}
+ */
+function extractCoverImage(images) {
+  if (!images) return null;
+  let arr = images;
+  if (typeof arr === 'string') {
+    try { arr = JSON.parse(arr); } catch { return null; }
+  }
+  return Array.isArray(arr) && arr.length > 0 ? arr[0] : null;
+}
+
+/**
+ * 将扁平 seller 字段嵌套为 seller 对象
+ * 数据库返回: seller_nickname, seller_avatar, seller_credit_score, ...
+ * API 规范: { seller: { id, nickname, avatar, credit_score, ... } }
+ */
+function nestSeller(row) {
+  if (!row || row.seller_nickname === undefined) return row;
+
+  const seller = {
+    id: row.seller_id,
+    nickname: row.seller_nickname,
+    avatar: row.seller_avatar,
+    credit_score: row.seller_credit_score,
+  };
+
+  // detail 接口额外返回班级、宿舍、评价摘要
+  if (row.seller_class_name !== undefined) {
+    seller.class_name = row.seller_class_name;
+  }
+  if (row.seller_dorm_building !== undefined) {
+    seller.dorm_building = row.seller_dorm_building;
+  }
+
+  // 清理扁平字段
+  const result = { ...row };
+  delete result.seller_nickname;
+  delete result.seller_avatar;
+  delete result.seller_credit_score;
+  delete result.seller_class_name;
+  delete result.seller_dorm_building;
+
+  return { ...result, seller };
+}
 
 const productService = {
   /**
@@ -20,28 +70,40 @@ const productService = {
    * @returns {Promise<{list: Array, total: number, page: number, pageSize: number}>}
    */
   async list(filters) {
-    // 分页边界校验
     const page = Math.max(1, parseInt(filters.page, 10) || 1);
     const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(filters.pageSize, 10) || 20));
 
-    if (isNaN(page) || isNaN(pageSize)) {
-      throw invalidPagination();
-    }
+    const result = await productRepo.list({ ...filters, page, pageSize });
 
-    return productRepo.list({ ...filters, page, pageSize });
+    // 转换响应格式：嵌套 seller + 添加 cover_image
+    result.list = result.list.map((row) => ({
+      ...nestSeller(row),
+      cover_image: extractCoverImage(row.images),
+    }));
+
+    return result;
   },
 
   /**
    * 商品详情
    * @param {number} id
+   * @param {Object} [viewer] - 当前登录用户（用于权限判断），可选
    * @returns {Promise<Object>}
    */
-  async detail(id) {
+  async detail(id, viewer) {
     const product = await productRepo.findById(id);
     if (!product) {
       throw notFound('商品');
     }
-    return product;
+
+    // off_shelf 商品仅卖家和管理员可见
+    if (product.status === 'off_shelf') {
+      if (!viewer || (viewer.id !== product.seller_id && viewer.role !== 'admin')) {
+        throw notFound('商品');
+      }
+    }
+
+    return nestSeller(product);
   },
 
   /**
@@ -52,19 +114,34 @@ const productService = {
    * @returns {Promise<Object>}
    */
   async create(sellerId, creditScore, data) {
-    // 信誉分阈值检查
     if (creditScore < config.credit.publishThreshold) {
       throw creditTooLowPublish();
     }
 
-    // 图片数量检查
     const images = data.images || [];
     if (images.length > MAX_IMAGES) {
       const { tooManyImages } = require('../utils/errors');
       throw tooManyImages();
     }
 
-    return productRepo.create({
+    // 售价不能高于原价（前端校验可被绕过，后端必须兜底）
+    if (parseFloat(data.price) > parseFloat(data.original_price)) {
+      throw badRequest('售价不能高于原价');
+    }
+
+    // 敏感词过滤
+    const sensitiveFields = ['title', 'description', 'trade_location'];
+    for (const field of sensitiveFields) {
+      if (data[field]) {
+        const check = sensitiveFilter.check(data[field]);
+        if (check.hasSensitive) {
+          const { sensitiveWord } = require('../utils/errors');
+          throw sensitiveWord();
+        }
+      }
+    }
+
+    const product = await productRepo.create({
       seller_id: sellerId,
       title: data.title,
       description: data.description || null,
@@ -76,10 +153,12 @@ const productService = {
       negotiable: data.negotiable !== false,
       images,
     });
+
+    return nestSeller(product);
   },
 
   /**
-   * 编辑商品（仅发布者可编辑）
+   * 编辑商品（仅发布者可编辑，sold/frozen 状态不可编辑）
    * @param {number} productId
    * @param {number} userId
    * @param {Object} updates
@@ -95,36 +174,66 @@ const productService = {
       throw notOwner();
     }
 
-    // 图片数量检查
+    // sold / frozen / deleted 状态不可编辑
+    if (['sold', 'frozen', 'deleted'].includes(product.status)) {
+      throw invalidStatus('商品');
+    }
+
+    // 售价不能高于原价（考虑部分更新：未传字段沿用旧值）
+    const effectivePrice = updates.price !== undefined
+      ? parseFloat(updates.price) : parseFloat(product.price);
+    const effectiveOriginal = updates.original_price !== undefined
+      ? parseFloat(updates.original_price) : parseFloat(product.original_price);
+    if (effectivePrice > effectiveOriginal) {
+      throw badRequest('售价不能高于原价');
+    }
+
     if (updates.images && updates.images.length > MAX_IMAGES) {
       const { tooManyImages } = require('../utils/errors');
       throw tooManyImages();
     }
 
-    return productRepo.update(productId, updates);
+    // 敏感词过滤
+    const sensitiveFields = ['title', 'description', 'trade_location'];
+    for (const field of sensitiveFields) {
+      if (updates[field]) {
+        const check = sensitiveFilter.check(updates[field]);
+        if (check.hasSensitive) {
+          const { sensitiveWord } = require('../utils/errors');
+          throw sensitiveWord();
+        }
+      }
+    }
+
+    const updated = await productRepo.update(productId, updates);
+    return nestSeller(updated);
   },
 
   /**
    * 删除商品（软删除：status → deleted）
-   * 仅当商品状态为 active 时可删除
+   * 仅当商品状态为 active 时可删除。
+   * 使用事务 + SELECT ... FOR UPDATE 防止 TOCTOU 竞态条件。
    * @param {number} productId
    * @param {number} userId
    * @returns {Promise<void>}
    */
   async delete(productId, userId) {
-    const product = await productRepo.findById(productId);
-    if (!product) {
-      throw notFound('商品');
-    }
-    if (product.seller_id !== userId) {
-      const { notOwner } = require('../utils/errors');
-      throw notOwner();
-    }
-    if (product.status !== 'active') {
-      throw invalidStatus('商品');
-    }
+    await db.transaction(async (conn) => {
+      // SELECT ... FOR UPDATE 锁定行，防止并发读取后写覆盖
+      const product = await productRepo.findById(productId, conn);
+      if (!product) {
+        throw notFound('商品');
+      }
+      if (product.seller_id !== userId) {
+        const { notOwner } = require('../utils/errors');
+        throw notOwner();
+      }
+      if (product.status !== 'active') {
+        throw invalidStatus('商品');
+      }
 
-    await productRepo.updateStatus(productId, 'deleted');
+      await productRepo.updateStatus(productId, 'deleted', conn);
+    });
   },
 
   /**
@@ -134,7 +243,14 @@ const productService = {
    * @returns {Promise<{list: Array, total: number}>}
    */
   async findBySeller(sellerId, filters) {
-    return productRepo.findBySeller(sellerId, filters);
+    const result = await productRepo.findBySeller(sellerId, filters);
+    // 统一响应格式：与 list() 一致，包含 cover_image 和 seller 字段
+    result.list = result.list.map((row) => ({
+      ...row,
+      seller: null, // 自己的商品不需要卖家信息
+      cover_image: extractCoverImage(row.images),
+    }));
+    return result;
   },
 };
 
