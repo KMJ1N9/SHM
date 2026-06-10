@@ -15,6 +15,8 @@
 import { defineStore } from 'pinia';
 import { login as loginAPI, refreshToken as refreshAPI, getMe as getMeAPI } from '@/api/auth';
 import { saveTokens, clearAuth } from '@/api/index';
+import { logoutIM } from '@/utils/im';
+import { useAppStore } from '@/store/app';
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -29,6 +31,18 @@ export const useUserStore = defineStore('user', {
   getters: {
     /** 是否已登录——同时检查 user 和 accessToken */
     isLoggedIn: (state) => !!(state.user && state.accessToken),
+
+    /** 当前信誉分（默认 100） */
+    creditScore: (state) => state.user?.credit_score ?? 100,
+
+    /** 是否可以发布商品（信誉分 ≥ 60） */
+    canPublish: (state) => (state.user?.credit_score ?? 100) >= 60,
+
+    /** 是否可以发起交易（信誉分 ≥ 30） */
+    canTrade: (state) => (state.user?.credit_score ?? 100) >= 30,
+
+    /** 是否为管理员（可访问工单管理/数据看板） */
+    isAdmin: (state) => state.user?.role === 'admin' || state.user?.role === 'cs',
   },
 
   actions: {
@@ -60,15 +74,26 @@ export const useUserStore = defineStore('user', {
     /**
      * 退出登录
      *
-     * 清除所有状态 + Storage + 跳转登录页。
+     * 清除所有状态 + Storage + 停止后台轮询/IM → 跳转登录页。
      */
     logoutAction() {
+      // 1. 停止通知轮询（防止后台定时器继续发 401 请求）
+      const appStore = useAppStore();
+      appStore.setShouldPoll(false);
+      appStore.setUnreadNotifyCount(0);
+      appStore.setUnreadMsgCount(0);
+
+      // 2. 登出 IM（异步，不阻塞跳转）
+      logoutIM().catch(() => {});
+
+      // 3. 清除状态
       this.user = null;
       this.accessToken = '';
       this.refreshToken = '';
 
       clearAuth();
 
+      // 4. 跳转登录页
       uni.reLaunch({ url: '/pages/auth/login' });
     },
 

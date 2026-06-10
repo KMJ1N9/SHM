@@ -28,5 +28,6 @@ router.post(
 );
 
 router.get('/', reportController.list);
+router.get('/:id', reportController.detail);
 
 module.exports = router;

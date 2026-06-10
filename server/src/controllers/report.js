@@ -28,6 +28,22 @@ const reportController = {
       next(err);
     }
   },
+
+  /**
+   * GET /api/reports/:id — 举报详情
+   */
+  async detail(req, res, next) {
+    try {
+      const report = await reportService.detail(
+        parseInt(req.params.id, 10),
+        req.user.id,
+        req.user.role
+      );
+      res.json({ code: 0, message: 'ok', data: report });
+    } catch (err) {
+      next(err);
+    }
+  },
 };
 
 module.exports = reportController;

@@ -169,6 +169,14 @@
       }
     },
     {
+      "path": "pages/report/list",
+      "style": {
+        "navigationBarTitleText": "我的举报",
+        "navigationBarBackgroundColor": "#4A90D9",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
       "path": "pages/admin/dashboard",
       "style": {
         "navigationBarTitleText": "数据看板",

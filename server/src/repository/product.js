@@ -29,11 +29,13 @@ const productRepo = {
   async list(filters) {
     const {
       keyword, category, condition, priceMin, priceMax,
-      sort = 'latest', page = 1, pageSize = 20,
+      sort = 'latest',
     } = filters;
+    // query string 参数均为字符串，LIMIT/OFFSET 需要整数
+    const page = Math.max(1, parseInt(filters.page, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(filters.pageSize, 10) || 20));
 
-    const maxPageSize = 50;
-    const safePageSize = Math.min(pageSize, maxPageSize);
+
     const conditions = ['p.status = ?'];
     const params = ['active'];
 
@@ -78,21 +80,21 @@ const productRepo = {
     );
 
     // 列表查询（JOIN 卖家信息）
-    const offset = (page - 1) * safePageSize;
+    const offset = (page - 1) * pageSize;
     const rows = await query(
       `SELECT ${LIST_FIELDS}
        FROM products p
        JOIN users u ON p.seller_id = u.id
        ${where} ${orderBy}
        LIMIT ? OFFSET ?`,
-      [...params, safePageSize, offset]
+      [...params, pageSize, offset]
     );
 
     return {
       list: rows,
       total: countResult.total,
       page,
-      pageSize: safePageSize,
+      pageSize: pageSize,
     };
   },
 

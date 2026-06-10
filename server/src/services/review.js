@@ -12,7 +12,7 @@
 
 const reviewRepo = require('../repository/review');
 const orderRepo = require('../repository/order');
-const userRepo = require('../repository/user');
+const creditService = require('./credit');
 const {
   notFound, invalidStatus, orderStateInvalid, duplicateReport,
 } = require('../utils/errors');
@@ -60,25 +60,26 @@ const reviewService = {
       comment: data.comment || null,
     });
 
-    // 计算平均分并联动信誉分
-    const avgScore = Math.round(
-      (data.communication_score + data.punctuality_score + data.accuracy_score) / 3
-    );
+    // 计算总分并联动信誉分（通过 creditService 确保写入变动通知）
+    // 用分数和判断避免 Math.round 边界问题：总分≥12=好评(均分≥4)，总分≤6=差评(均分≤2)
+    const sum = data.communication_score + data.punctuality_score + data.accuracy_score;
 
     const config = require('../config');
-    if (avgScore >= 4) {
+    if (sum >= 12) {
       // 好评：被评价方 +1
-      await userRepo.updateCreditScore(
+      await creditService.changeScore(
         data.reviewee_id,
         config.credit.rewardPositiveReview,
-        config.credit.max
+        '好评奖励',
+        { refId: data.order_id }
       );
-    } else if (avgScore <= 2) {
+    } else if (sum <= 6) {
       // 差评：被评价方 -5
-      await userRepo.updateCreditScore(
+      await creditService.changeScore(
         data.reviewee_id,
         -config.credit.deductNegativeReview,
-        config.credit.max
+        '差评扣分',
+        { refId: data.order_id }
       );
     }
 

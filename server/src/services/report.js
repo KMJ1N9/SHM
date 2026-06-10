@@ -69,6 +69,26 @@ const reportService = {
   async list(reporterId, filters) {
     return reportRepo.list({ ...filters, reporter_id: reporterId });
   },
+
+  /**
+   * 举报详情（仅举报人本人或 cs/admin 可查看）
+   * @param {number} reportId
+   * @param {number} userId
+   * @param {string} userRole - 用户角色（用于 cs/admin 权限判断）
+   * @returns {Promise<Object>}
+   */
+  async detail(reportId, userId, userRole) {
+    const report = await reportRepo.findDetailById(reportId);
+    if (!report) {
+      throw notFound('举报');
+    }
+    // 权限：本人的举报 或 cs/admin 角色
+    if (report.reporter_id !== userId && userRole !== 'cs' && userRole !== 'admin') {
+      const { notOwner } = require('../utils/errors');
+      throw notOwner();
+    }
+    return report;
+  },
 };
 
 module.exports = reportService;

@@ -15,7 +15,7 @@
 const config = require('../config');
 const orderRepo = require('../repository/order');
 const productRepo = require('../repository/product');
-const userRepo = require('../repository/user');
+const creditService = require('./credit');
 const imProvider = require('./im/provider');
 const logger = require('../utils/logger').business;
 const {
@@ -180,10 +180,13 @@ const orderService = {
     // 状态校验 + FOR UPDATE 在 orderRepo.confirmOrder 内部完成
     const confirmed = await orderRepo.confirmOrder(orderId);
 
-    // 卖家信誉分 +2
+    // 卖家信誉分 +2（通过 creditService 确保写入变动通知）
     const sellerId = order.seller_id;
-    userRepo.updateCreditScore(sellerId, config.credit.rewardTransaction, config.credit.max)
-      .catch(err => logger.warn('信誉分更新失败', { orderId, sellerId, error: err.message }));
+    try {
+      await creditService.changeScore(sellerId, config.credit.rewardTransaction, '交易完成奖励', { refId: orderId });
+    } catch (err) {
+      logger.warn('信誉分更新失败', { orderId, sellerId, error: err.message });
+    }
 
     // IM 通知买卖双方互评
     const reviewMsg = {

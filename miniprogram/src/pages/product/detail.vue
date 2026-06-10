@@ -118,11 +118,11 @@
       </view>
 
       <!-- 卖家信息 -->
-      <view v-if="product.seller" class="seller-section" @click="goProfile">
+      <view v-if="product.seller" class="seller-section">
         <text class="section-title">
           卖家信息
         </text>
-        <view class="seller-card">
+        <view class="seller-card" @click="goProfile">
           <image
             class="seller-avatar"
             :src="product.seller.avatar || defaultAvatar"
@@ -151,6 +151,10 @@
             ›
           </text>
         </view>
+        <!-- 举报入口 — 仅非本人商品显示 -->
+        <view v-if="!isOwner" class="report-entry" @click="goReport">
+          <text>⚑ 举报商品</text>
+        </view>
       </view>
     </template>
 
@@ -161,6 +165,15 @@
           💬
         </text>
         <text>聊一聊</text>
+      </button>
+      <!-- 非本人发布的在售商品：我想要 -->
+      <button
+        v-if="!isOwner && product.status === 'active'"
+        class="action-btn action-buy"
+        :disabled="submitting"
+        @click="handleWant"
+      >
+        {{ submitting ? '处理中...' : '我想要' }}
       </button>
       <!-- 本人发布的商品显示编辑入口 -->
       <button
@@ -178,6 +191,7 @@
 import { ref } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { detail as getDetail } from '@/api/product';
+import { createOrder } from '@/api/order';
 import { resolveImageUrl } from '@/api/index';
 import SafeImage from '@/components/SafeImage.vue';
 import { useUserStore } from '@/store/user';
@@ -206,6 +220,9 @@ const defaultAvatar =
 
 /** 是否为自己的商品 */
 const isOwner = ref(false);
+
+/** 下单提交中 */
+const submitting = ref(false);
 
 /**
  * 页面加载
@@ -384,10 +401,97 @@ async function goChat() {
 }
 
 /**
+ * 举报商品 — 跳转举报提交页
+ */
+function goReport() {
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
+    return;
+  }
+  if (!product.value?.seller) return;
+  uni.navigateTo({
+    url: `/pages/report/submit?product_id=${product.value.id}&reported_user_id=${product.value.seller.id}`,
+  });
+}
+
+/**
  * 管理商品（本人发布）
  */
 function goManage() {
   uni.showToast({ title: '商品管理功能即将上线', icon: 'none', duration: 1500 });
+}
+
+/**
+ * 发起"我想要"——创建订单
+ *
+ * 校验链：
+ *   1. 必须登录
+ *   2. 不能购买自己的商品（前端拦截，后端也会校验）
+ *   3. 商品状态检查（必须为 active）
+ *   4. 二次确认弹窗（防止误触）
+ *   5. 调用 createOrder API → 后端校验商品状态 + 信誉分 + 幂等
+ *
+ * 成功 → 跳转订单详情页
+ * 失败 → 根据错误码展示提示
+ */
+async function handleWant() {
+  // 1. 登录检查
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
+    return;
+  }
+
+  // 2. 不能买自己的
+  if (isOwner.value) {
+    uni.showToast({ title: '不能购买自己发布的商品', icon: 'none', duration: 1500 });
+    return;
+  }
+
+  // 3. 商品状态检查
+  if (!product.value || product.value.status !== 'active') {
+    uni.showToast({ title: '该商品当前不可交易', icon: 'none', duration: 1500 });
+    return;
+  }
+
+  // 4. 防重复提交
+  if (submitting.value) return;
+
+  // 5. 二次确认（防止误触）
+  const { confirm } = await uni.showModal({
+    title: '确认下单',
+    content: '请确认是否要下单？下单后商品将标记为"正在交易"状态，其他人将无法购买。',
+    confirmText: '确认下单',
+    cancelText: '再想想',
+  });
+  if (!confirm) return;
+
+  submitting.value = true;
+  try {
+    const order = await createOrder({ product_id: product.value.id });
+    uni.showToast({ title: '下单成功', icon: 'success', duration: 1500 });
+    // 跳转到订单详情
+    uni.navigateTo({ url: `/pages/order/detail?id=${order.id}` });
+  } catch (err) {
+    const msg = err.message || '下单失败';
+    // 根据错误码给出友好提示
+    if (msg.includes('3004') || msg.includes('商品已')) {
+      uni.showToast({ title: '该商品已被其他人抢先下单', icon: 'none', duration: 2000 });
+      // 刷新商品状态
+      loadDetail();
+    } else if (msg.includes('3005') || msg.includes('自己')) {
+      uni.showToast({ title: '不能购买自己发布的商品', icon: 'none', duration: 1500 });
+    } else if (msg.includes('4009') || msg.includes('信誉')) {
+      uni.showModal({
+        title: '信誉分不足',
+        content: '你的信誉分低于 30，无法发起交易。请通过完成其他交易来恢复信誉分。',
+        showCancel: false,
+      });
+    } else {
+      uni.showToast({ title: msg, icon: 'none', duration: 2000 });
+    }
+  } finally {
+    submitting.value = false;
+  }
 }
 </script>
 
@@ -657,6 +761,19 @@ function goManage() {
   font-size: 36rpx;
   color: $color-muted;
   flex-shrink: 0;
+}
+
+// ── 举报入口 ──────────────────────────────────────────────
+.report-entry {
+  text-align: right;
+  padding-top: 12rpx;
+  margin-top: 8rpx;
+  border-top: 1rpx solid $color-divider;
+}
+
+.report-entry text {
+  font-size: $text-xs;
+  color: $color-muted;
 }
 
 // ── 底部操作栏 ──────────────────────────────────────────

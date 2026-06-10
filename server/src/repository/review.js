@@ -73,7 +73,9 @@ const reviewRepo = {
    * @returns {Promise<{summary: Object, list: Array, total: number}>}
    */
   async findByReviewee(userId, pagination = {}) {
-    const { page = 1, pageSize = 20 } = pagination;
+    // query string 参数均为字符串，LIMIT/OFFSET 需要整数
+    const page = Math.max(1, parseInt(pagination.page, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(pagination.pageSize, 10) || 20));
 
     // 聚合统计
     const [summary] = await query(

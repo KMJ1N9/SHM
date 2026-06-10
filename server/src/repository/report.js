@@ -69,6 +69,27 @@ const reportRepo = {
   },
 
   /**
+   * 根据 ID 查找举报/工单详情（含举报人/被举报人信息）
+   * @param {number} id
+   * @returns {Promise<Object|null>}
+   */
+  async findDetailById(id) {
+    const [row] = await query(
+      `SELECT r.id, r.reporter_id, r.reported_user_id, r.product_id, r.order_id,
+              r.type, r.description, r.evidence_images, r.status,
+              r.resolution, r.deleted_at, r.resolved_at, r.created_at, r.updated_at,
+              reporter.nickname AS reporter_nickname, reporter.avatar AS reporter_avatar,
+              reported.nickname AS reported_nickname, reported.avatar AS reported_avatar
+       FROM reports r
+       JOIN users reporter ON r.reporter_id = reporter.id
+       JOIN users reported ON r.reported_user_id = reported.id
+       WHERE r.id = ?`,
+      [id]
+    );
+    return row || null;
+  },
+
+  /**
    * 更新举报状态
    * @param {number} id
    * @param {string} status
@@ -172,7 +193,10 @@ const reportRepo = {
    * @returns {Promise<{list: Array, total: number}>}
    */
   async list(filters = {}) {
-    const { status = 'pending', type = 'all', reporter_id, page = 1, pageSize = 20 } = filters;
+    const { status = 'pending', type = 'all', reporter_id, page: rawPage, pageSize: rawPageSize } = filters;
+    // 强制整数解析（query string 参数均为 string 类型，LIMIT/OFFSET 需要整数）
+    const page = Math.max(1, parseInt(rawPage, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(rawPageSize, 10) || 20));
     const conditions = ['r.deleted_at IS NULL'];
     const params = [];
 
@@ -238,7 +262,10 @@ const reportRepo = {
    * @returns {Promise<{list: Array, total: number}>}
    */
   async listAdminLogs(filters = {}) {
-    const { admin_id, target_type, target_id, action, start_date, end_date, page = 1, pageSize = 20 } = filters;
+    const { admin_id, target_type, target_id, action, start_date, end_date, page: rawPage, pageSize: rawPageSize } = filters;
+    // 强制整数解析（query string 参数均为 string 类型，LIMIT/OFFSET 需要整数）
+    const page = Math.max(1, parseInt(rawPage, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(rawPageSize, 10) || 20));
     const conditions = [];
     const params = [];
 

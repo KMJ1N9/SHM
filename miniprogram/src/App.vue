@@ -109,12 +109,14 @@ watch(
 /** 启动通知未读轮询 */
 function startNotifyPolling() {
   if (notifyTimer) return; // 已在运行
+  appStore.setShouldPoll(true);
   fetchNotifyUnread();
   notifyTimer = setInterval(fetchNotifyUnread, POLL_INTERVAL);
 }
 
 /** 停止通知未读轮询 */
 function stopNotifyPolling() {
+  appStore.setShouldPoll(false);
   if (notifyTimer) {
     clearInterval(notifyTimer);
     notifyTimer = null;
@@ -123,6 +125,8 @@ function stopNotifyPolling() {
 
 /** 拉取未读通知数 */
 async function fetchNotifyUnread() {
+  // 双重守卫：已登出 或 已停止轮询 → 跳过
+  if (!userStore.isLoggedIn || !appStore.shouldPoll) return;
   try {
     const result = await unreadCount();
     appStore.setUnreadNotifyCount(result.count || 0);

@@ -24,6 +24,9 @@ export const useAppStore = defineStore('app', {
     unreadMsgCount: 0,
     /** @type {number} 通知未读数（由 App.vue 轮询更新） */
     unreadNotifyCount: 0,
+
+    /** @type {boolean} 是否允许通知轮询（退出登录时置 false 停止轮询） */
+    shouldPoll: true,
   }),
 
   getters: {
@@ -60,6 +63,11 @@ export const useAppStore = defineStore('app', {
     /** 设置通知未读数 */
     setUnreadNotifyCount(count) {
       this.unreadNotifyCount = count;
+    },
+
+    /** 设置是否允许轮询（退出登录时置 false） */
+    setShouldPoll(value) {
+      this.shouldPoll = value;
     },
   },
 });

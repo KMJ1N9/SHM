@@ -31,6 +31,38 @@
         <text class="menu-label">我的发布</text>
         <text class="menu-arrow">›</text>
       </view>
+      <view class="menu-item" @click="goReviews">
+        <text class="menu-icon">⭐</text>
+        <text class="menu-label">我的评价</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" @click="goCredit">
+        <text class="menu-icon">🛡️</text>
+        <text class="menu-label">信誉分明细</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" @click="goReports">
+        <text class="menu-icon">📝</text>
+        <text class="menu-label">我的举报</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 管理功能（仅管理员/cs 可见） -->
+    <view v-if="userStore.isAdmin" class="menu-section">
+      <view class="menu-section-header">
+        <text class="menu-section-title">管理功能</text>
+      </view>
+      <view class="menu-item" @click="goTickets">
+        <text class="menu-icon">🎫</text>
+        <text class="menu-label">工单管理</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" @click="goDashboard">
+        <text class="menu-icon">📊</text>
+        <text class="menu-label">数据看板</text>
+        <text class="menu-arrow">›</text>
+      </view>
     </view>
 
     <!-- 退出登录 -->
@@ -61,6 +93,26 @@ function goOrders() {
 
 function goMyProducts() {
   uni.navigateTo({ url: '/pages/product/my' });
+}
+
+function goReviews() {
+  uni.navigateTo({ url: '/pages/user/reviews' });
+}
+
+function goCredit() {
+  uni.navigateTo({ url: '/pages/user/credit' });
+}
+
+function goReports() {
+  uni.navigateTo({ url: '/pages/report/list' });
+}
+
+function goTickets() {
+  uni.navigateTo({ url: '/pages/admin/tickets' });
+}
+
+function goDashboard() {
+  uni.navigateTo({ url: '/pages/admin/dashboard' });
 }
 
 function onLogout() {
@@ -151,6 +203,16 @@ function onLogout() {
 .menu-section {
   background: $color-surface;
   margin-top: 16rpx;
+}
+
+.menu-section-header {
+  padding: 24rpx $space-page 12rpx;
+}
+
+.menu-section-title {
+  font-size: $text-xs;
+  color: $color-muted;
+  font-weight: $weight-medium;
 }
 
 .menu-item {

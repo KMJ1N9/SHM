@@ -16,13 +16,21 @@ const ORDER_FIELDS = [
 
 const orderRepo = {
   /**
-   * 根据 ID 查找订单
+   * 根据 ID 查找订单（含买卖双方昵称和头像）
    * @param {number} id
    * @returns {Promise<Object|null>}
    */
   async findById(id) {
     const [row] = await query(
-      `SELECT ${ORDER_FIELDS} FROM orders WHERE id = ?`,
+      `SELECT o.id, o.product_id, o.buyer_id, o.seller_id, o.status,
+              o.cancelled_by, o.idempotent_key, o.product_snapshot,
+              o.met_at, o.confirmed_at, o.created_at, o.updated_at,
+              buyer.nickname AS buyer_nickname, buyer.avatar AS buyer_avatar,
+              seller.nickname AS seller_nickname, seller.avatar AS seller_avatar
+       FROM orders o
+       JOIN users buyer ON o.buyer_id = buyer.id
+       JOIN users seller ON o.seller_id = seller.id
+       WHERE o.id = ?`,
       [id]
     );
     return row || null;
@@ -126,7 +134,10 @@ const orderRepo = {
    * @returns {Promise<{list: Array, total: number}>}
    */
   async findByUser(userId, filters = {}) {
-    const { role = 'all', status = 'all', page = 1, pageSize = 20 } = filters;
+    const { role = 'all', status = 'all' } = filters;
+    // query string 参数均为字符串，LIMIT/OFFSET 需要整数
+    const page = Math.max(1, parseInt(filters.page, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(filters.pageSize, 10) || 20));
     const conditions = [];
     const params = [];
 

@@ -107,9 +107,18 @@ function clearAuth() {
 
 /**
  * 强制跳转登录页面
+ *
+ * 如果当前已在登录页，跳过跳转——防止后台轮询持续触发 401 →
+ * redirectToLogin → reLaunch → 登录页反复刷新的死循环。
  */
 function redirectToLogin() {
   clearAuth();
+  // 检查当前是否已在登录页，避免死循环刷新
+  const pages = getCurrentPages();
+  const currentPage = pages[pages.length - 1];
+  if (currentPage && currentPage.route === 'pages/auth/login') {
+    return;
+  }
   // 使用 reLaunch 清空页面栈，防止返回到需要鉴权的页面
   uni.reLaunch({ url: '/pages/auth/login' });
 }

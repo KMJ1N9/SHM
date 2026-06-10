@@ -28,7 +28,9 @@ const creditRepo = {
    * @returns {Promise<{list: Array, total: number}>}
    */
   async findChangeLogs(userId, pagination = {}) {
-    const { page = 1, pageSize = 20 } = pagination;
+    // query string 参数均为字符串，LIMIT/OFFSET 需要整数
+    const page = Math.max(1, parseInt(pagination.page, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(pagination.pageSize, 10) || 20));
 
     const [countResult] = await query(
       `SELECT COUNT(*) AS total FROM notifications
