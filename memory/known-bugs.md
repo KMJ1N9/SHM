@@ -3,7 +3,7 @@ name: known-bugs
 description: 已知 Bug 列表 — 发现时间、位置、根因、修复方案、修复状态
 metadata:
   type: project
-  updatedAt: 2026-06-08T20:30
+  updatedAt: 2026-06-10T10:00
 ---
 
 # 已知 Bug
@@ -330,5 +330,93 @@ metadata:
   2. [detail.vue:342-346](miniprogram/src/pages/product/detail.vue#L342-L346) — `goChat()` 改为 `async`，使用 `waitForReady(8000)` 等待 IM 就绪，处理用户快速点击时 IM 仍在初始化的情况
   3. [App.vue:54-56](miniprogram/src/App.vue#L54-L56) — IM 最终初始化失败时显示 toast 提示用户重启，不再静默吞错
 - **验证**: 后端 7 文件 106 用例全过、前端构建成功、UserSig 格式正确无 `undefined`
+
+## BUG-025: handleWant() 下发 camelCase `productId`，后端要求 snake_case `product_id` ✅ 已修复
+
+- **发现时间**: 2026-06-10（第 6 轮真机测试）
+- **修复时间**: 2026-06-10
+- **位置**: [miniprogram/src/pages/product/detail.vue:441](miniprogram/src/pages/product/detail.vue#L441) — handleWant()
+- **严重程度**: P0（所有用户点击「我想要」均提示 `"product_id" is required`，下单功能完全不可用）
+- **根因**: 前端 `createOrder({ productId: product.value.id })` 使用 camelCase，而后端 `routes/order.js` 的 Joi 校验声明 `product_id: Joi.number().integer().required()`（snake_case）。HTTP 请求发 `{ productId: 1 }` → 后端收到 → Joi 校验 `product_id` 不存在 → 返回 400/4001。
+- **修复**: `{ productId: product.value.id }` → `{ product_id: product.value.id }`
+
+## BUG-026: 6 个 repo 的 LIMIT/OFFSET 参数未 parseInt 导致 500 ✅ 已修复
+
+- **发现时间**: 2026-06-10（第 6 轮真机测试）
+- **修复时间**: 2026-06-10
+- **位置**:
+  - [server/src/repository/order.js:129](server/src/repository/order.js#L129) — findByUser()
+  - [server/src/repository/review.js:75](server/src/repository/review.js#L75) — findByReviewee()
+  - [server/src/repository/credit.js:30](server/src/repository/credit.js#L30) — findChangeLogs()
+  - [server/src/repository/user.js:140](server/src/repository/user.js#L140) — listWithFilters()
+  - [server/src/repository/report.js:174](server/src/repository/report.js#L174) — list()
+  - [server/src/repository/report.js:240](server/src/repository/report.js#L240) — listAdminLogs()
+- **严重程度**: P0（6 个 API 端点返回 500 Internal Server Error，影响范围：订单列表/评价记录/信誉变动/用户管理/举报列表/审计日志）
+- **根因**: Express `req.query` 参数均为字符串类型。`pool.query()` 客户端参数化转义会将字符串用引号包裹（如 `LIMIT '20' OFFSET 0`），导致 MySQL 语法错误。BUG-006 修复了 `product.findBySeller()` 但遗漏了其他 6 个分页方法。
+- **修复**: 所有分页方法统一使用 `Math.max(1, parseInt(filters.page, 10) || 1)` + `Math.min(50, Math.max(1, parseInt(filters.pageSize, 10) || 20))` 模式解析整数。
+- **侥幸幸存**: `product.list()` 因 `Math.min(pageSize, maxPageSize)` 隐式将 `pageSize` 强制转为数字而幸免，但 `page` 仍为字符串（已一并修复）。
+- **系统性修复**: `product.list()` 同样应用 parseInt 确保 API 响应类型一致。
+- **验证**: `npx vitest run` 9 文件 126 用例全过；curl 实测 3 个之前 500 的端点均返回 `code: 0`；POST /api/orders 从 400 变为正常业务错误码 3005。
+- **Why 同 BUG-006 但未被捕获:** BUG-006 修复局限于 `findBySeller`，缺少系统性 grep 排查所有 LIMIT/OFFSET 使用点。
+
+## BUG-027: findById() 未 JOIN users，订单详情交易对象显示"卖家"/"买家" ✅ 已修复
+
+- **发现时间**: 2026-06-10（第 6 轮真机测试）
+- **修复时间**: 2026-06-10
+- **位置**: [server/src/repository/order.js:23-28](server/src/repository/order.js#L23-L28) — findById()
+- **严重程度**: P1（订单详情页交易对象名称和头像均显示占位符，用户体验断裂）
+- **根因**: `findById()` 只 SELECT `orders` 表字段，未 JOIN `users` 表获取 `buyer_nickname` / `seller_nickname` / `buyer_avatar` / `seller_avatar`。前端 `partnerName` 取 `order.seller_nickname || '卖家'` 字段不存在时 fallback 到硬编码的 "卖家"/"买家"。列表接口 `findByUser()` 有 JOIN 所以正常。
+- **修复**: `findById()` 改为 `FROM orders o JOIN users buyer ON o.buyer_id = buyer.id JOIN users seller ON o.seller_id = seller.id`，明确列出所有字段，与 `findByUser()` 保持一致。
+- **影响面**: GET /api/orders/:id（订单详情）、以及所有通过 `findById()` 返回订单的写操作（create/markAsMet/updateStatus）。`findByIdempotentKey` / `findTimeoutPending` / `findTimeoutMet` 不需要昵称，保持不变。
+
+## BUG-028: StarRating v-model 协议不匹配 + touchend 事件触发早于 tap，星级评价无法选中 ✅ 已修复
+
+- **发现时间**: 2026-06-10（第 6 轮手工回归测试）
+- **修复时间**: 2026-06-10
+- **位置**: 
+  - [miniprogram/src/components/StarRating.vue](miniprogram/src/components/StarRating.vue) — props/emit/事件处理
+  - [miniprogram/src/pages/user/reviews.vue](miniprogram/src/pages/user/reviews.vue) — 6 处 `:value` → `:model-value`
+- **严重程度**: P0（评价弹窗三个维度评分全部无法使用——手指离开后星星归零）
+- **根因（双 Bug）**:
+  1. **v-model 协议不匹配**: StarRating 使用 `value` prop + `change` event，但 Vue 3 的 `v-model` 绑定的是 `modelValue` prop + `update:modelValue` event。`order/detail.vue` 中 `v-model="reviewForm.communicationScore"` 无法收到评分数据——子组件 emit 的 `change` 事件被父组件的 `v-model` 忽略。
+  2. **触摸事件顺序**: 模板同时绑定了 `@touchend="hoverIndex = 0"` 和 `@tap="handleClick(n)"`。微信小程序中 `touchend` 先于 `tap` 触发，`hoverIndex` 先被重置为 0（视觉归零），然后 `tap` 才 emit `change`（但父组件收不到，因 bug #1）。
+- **修复**:
+  1. StarRating prop: `value` → `modelValue`；emit: `'change'` → `'update:modelValue'`；移除 `@touchend`（避免在 `tap` 前重置 hover）；`handleClick` 内部 `emit` 后同步重置 `hoverIndex = 0`（借助 Vue 3 emit 同步更新父组件的特性，`modelValue` prop 在 `hoverIndex` 重置前已更新，displayValue 正常回落）。
+  2. `user/reviews.vue` 6 处只读使用 `:value` → `:model-value`。
+- **影响面**: 评价弹窗三维度（沟通态度/守时程度/描述一致度）评分交互全部修复，只读展示（评价记录页）同步适配。
+- **验证**: ESLint src/ 0 errors；build 成功。
+
+## BUG-029: submitReview() camelCase 字段名 + 缺少 reviewee_id，POST /api/reviews 400 ✅ 已修复
+
+- **发现时间**: 2026-06-10（第 6 轮真机测试，提交评价）
+- **修复时间**: 2026-06-10
+- **位置**: [miniprogram/src/pages/order/detail.vue:576-582](miniprogram/src/pages/order/detail.vue#L576-L582) — submitReview()
+- **严重程度**: P0（提交评价 400 Bad Request，评价功能完全不可用）
+- **根因（双 Bug）**:
+  1. **camelCase/snake_case 字段名不匹配**: 前端发送 `orderId` / `communicationScore` / `punctualityScore` / `accuracyScore`，但后端 Joi 校验要求 `order_id` / `communication_score` / `punctuality_score` / `accuracy_score`。同 BUG-025 模式。
+  2. **缺少必填字段 `reviewee_id`**: 前端根本没有传 `reviewee_id`（被评价人 ID），后端 Joi 将其标记为 `required()`。
+- **修复**: 字段名全部改为 snake_case；新增 `reviewee_id: isBuyer.value ? order.value.seller_id : order.value.buyer_id`（评价人 = 当前用户时，被评价人 = 交易对方）。
+- **验证**: ESLint src/ 0 errors；build 成功。
+
+## BUG-030: canReview 未检查已评价状态 + 订单详情页缺少评价展示 ✅ 已修复
+
+- **发现时间**: 2026-06-10（第 6 轮真机测试，评价后按钮仍在）
+- **修复时间**: 2026-06-10
+- **位置**: [miniprogram/src/pages/order/detail.vue](miniprogram/src/pages/order/detail.vue) — canReview/loadOrder/submitReview + 模板 + 样式
+- **严重程度**: P1（UX 断裂——评价完按钮不消失，且找不到已提交的评价内容）
+- **根因（双问题）**:
+  1. **canReview 过于简化**: 仅判断 `status === 'completed'`，不检查当前用户是否已评价。`loadOrder()` 从未请求该订单的评价列表，`canReview` 无数据可判断。
+  2. **订单详情页无评价展示**: 模板只含评价弹窗（提交用），没有展示已有评价的 section。
+- **修复**:
+  1. `loadOrder()` 改为 `Promise.all` 并行加载订单 + 评价（评价失败降级为空数组，不阻塞页面）。
+  2. 新增 `myReview` computed（`reviews.value.find(r => r.reviewer_id === myId.value)`），`canReview` 改为 `status === COMPLETED && !myReview.value`。
+  3. `submitReview()` 成功后先 `reviews.value.push(...)` 本地追加评价（即时 UI 更新），再后台 `loadOrder()` 静默刷新（获取真实 DB ID + 对方评价）。
+  4. 模板新增「评价信息」section-card：头像 / 昵称 / 时间 / 三维 StarRating(只读) / 文字评价引用。
+  5. 补充 `.review-item` / `.review-item-header` / `.review-item-scores` / `.review-dim-item` / `.review-item-comment` 样式。
+- **影响面**: 订单详情页 ~+80 行模板 + ~+80 行样式；评价流程完整闭环（提交 → 展示 → 按钮消失）。
+- **验证**: ESLint src/ 0 errors；build 成功。
+- **布局修正 (2026-06-10)**: 三个评分维度标签+星级横向排列在小屏手机上溢出。`.review-item-scores` 改为 `flex-direction: column`，`gap: 32rpx → 12rpx`，纵向排列适配移动端。
+
+**Why:** BUG-025~030 全部已修复 ✅。第 6 轮真机测试 + 回归测试发现 6 个 Bug（P0×4 + P1×2），均已修复并验证通过。
 
 **How to apply:** 发现新 Bug 时按此格式追加。修复后标记 ✅ 并记录修复方案。详见 [[iteration3-audit]] [[iteration4-audit]] [[iteration5-audit]]。
