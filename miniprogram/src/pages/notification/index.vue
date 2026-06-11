@@ -84,13 +84,8 @@
     <!-- ============================================================ -->
     <!-- 空状态 -->
     <!-- ============================================================ -->
-    <view v-else-if="!loading" class="notify-empty">
-      <text class="notify-empty-emoji">
-        🔔
-      </text>
-      <text class="notify-empty-title">
-        {{ activeType === 'all' ? '暂无通知' : '暂无此类通知' }}
-      </text>
+    <view v-else-if="!loading">
+      <EmptyState icon="🔔" :title="activeType === 'all' ? '暂无通知' : '暂无此类通知'" />
     </view>
 
     <!-- 加载中 -->
@@ -110,6 +105,7 @@ import {
   markRead,
   markAllRead,
 } from '@/api/notification';
+import EmptyState from '@/components/EmptyState.vue';
 
 // ============================================================
 // 类型筛选

@@ -100,11 +100,22 @@ const reviewService = {
 
   /**
    * 获取某用户的评价列表（含聚合统计）
+   *
+   * 自动路由分页策略：
+   *   pagination.cursor 存在 → 游标分页（listByCursor），O(1) 定位
+   *   pagination.cursor 不存在 → 偏移分页（findByReviewee），兼容旧调用
+   *
    * @param {number} userId
    * @param {Object} pagination
-   * @returns {Promise<{summary: Object, list: Array, total: number}>}
+   * @returns {Promise<{summary: Object, list: Array, total: number, cursor?: number, hasMore?: boolean}>}
    */
   async listByUser(userId, pagination) {
+    if (pagination && pagination.cursor !== undefined && pagination.cursor !== null) {
+      return reviewRepo.listByCursor(userId, pagination);
+    }
+    if (pagination && pagination.limit && !pagination.page) {
+      return reviewRepo.listByCursor(userId, pagination);
+    }
     return reviewRepo.findByReviewee(userId, pagination);
   },
 };

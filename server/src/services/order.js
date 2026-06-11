@@ -94,11 +94,23 @@ const orderService = {
 
   /**
    * 我的订单列表
+   *
+   * 自动路由分页策略：
+   *   filters.cursor 存在 → 游标分页（listByCursor），O(1) 定位
+   *   filters.cursor 不存在 → 偏移分页（findByUser），兼容旧调用
+   *
    * @param {number} userId
-   * @param {Object} filters - { role?, status?, page, pageSize }
-   * @returns {Promise<{list: Array, total: number}>}
+   * @param {Object} filters - { role?, status?, page?, pageSize?, cursor?, limit }
+   * @returns {Promise<{list: Array, total: number, cursor?: number, hasMore?: boolean}>}
    */
   async list(userId, filters) {
+    if (filters.cursor !== undefined && filters.cursor !== null) {
+      return orderRepo.listByCursor({ ...filters, userId });
+    }
+    // 也支持显式传 cursor=0 或首次请求走游标
+    if (filters.limit && !filters.page) {
+      return orderRepo.listByCursor({ ...filters, userId });
+    }
     return orderRepo.findByUser(userId, filters);
   },
 

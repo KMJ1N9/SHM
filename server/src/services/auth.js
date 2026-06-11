@@ -44,7 +44,7 @@ const authService = {
     try {
       // TODO: Phase 2 — 替换为真实微信 API 调用
       // 当前 MVP 阶段使用 mock 数据快速跑通流程
-      if (process.env.NODE_ENV === 'development' && code.startsWith('mock_')) {
+      if ((process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') && code.startsWith('mock_')) {
         phone = code.replace('mock_', '');
       } else {
         // 真实微信 API 调用（待微信开放平台审核通过后启用）

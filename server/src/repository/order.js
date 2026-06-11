@@ -208,6 +208,89 @@ const orderRepo = {
     );
     return rows;
   },
+
+  /**
+   * 游标分页查询订单列表
+   *
+   * 基于 id DESC 的游标分页，O(1) 定位，避免 OFFSET 大页码退化。
+   * 游标值 = 上一页最后一条记录的 id，首页传 null。
+   *
+   * @param {Object} filters - { userId, role?, status?, cursor?, limit }
+   * @returns {Promise<{list: Array, total: number, cursor: number|null, hasMore: boolean}>}
+   */
+  async listByCursor(filters) {
+    const { userId, role = 'all', status = 'all' } = filters;
+    const cursor = filters.cursor ? parseInt(filters.cursor, 10) : null;
+    const limit = Math.min(50, Math.max(1, parseInt(filters.limit, 10) || 20));
+
+    // 基础条件（不含 cursor — COUNT 和数据查询共用）
+    const baseConditions = [];
+    const baseParams = [];
+
+    if (role === 'buyer') {
+      baseConditions.push('o.buyer_id = ?');
+      baseParams.push(userId);
+    } else if (role === 'seller') {
+      baseConditions.push('o.seller_id = ?');
+      baseParams.push(userId);
+    } else {
+      baseConditions.push('(o.buyer_id = ? OR o.seller_id = ?)');
+      baseParams.push(userId, userId);
+    }
+
+    if (status && status !== 'all') {
+      baseConditions.push('o.status = ?');
+      baseParams.push(status);
+    }
+
+    const baseWhere = baseConditions.length > 0
+      ? `WHERE ${baseConditions.join(' AND ')}`
+      : '';
+
+    // COUNT（不含 cursor 条件 — 总数应统计全部匹配行）
+    const [countResult] = await query(
+      `SELECT COUNT(*) AS total FROM orders o ${baseWhere}`,
+      baseParams
+    );
+
+    // 数据查询（含 cursor 条件）
+    const dataConditions = [...baseConditions];
+    const dataParams = [...baseParams];
+    if (cursor) {
+      dataConditions.push('o.id < ?');
+      dataParams.push(cursor);
+    }
+
+    const dataWhere = dataConditions.length > 0
+      ? `WHERE ${dataConditions.join(' AND ')}`
+      : '';
+
+    const rows = await query(
+      `SELECT o.id, o.product_id, o.buyer_id, o.seller_id, o.status,
+              o.cancelled_by, o.product_snapshot, o.met_at, o.confirmed_at,
+              o.created_at, o.updated_at,
+              buyer.nickname AS buyer_nickname, buyer.avatar AS buyer_avatar,
+              seller.nickname AS seller_nickname, seller.avatar AS seller_avatar
+       FROM orders o
+       JOIN users buyer ON o.buyer_id = buyer.id
+       JOIN users seller ON o.seller_id = seller.id
+       ${dataWhere}
+       ORDER BY o.id DESC
+       LIMIT ?`,
+      [...dataParams, limit + 1]
+    );
+
+    const hasMore = rows.length > limit;
+    const list = rows.slice(0, limit);
+    const nextCursor = list.length > 0 ? list[list.length - 1].id : null;
+
+    return {
+      list,
+      total: countResult.total,
+      cursor: hasMore ? nextCursor : null,
+      hasMore,
+    };
+  },
   /**
    * 确认收货（事务：订单→completed + 商品→sold，原子操作）
    *

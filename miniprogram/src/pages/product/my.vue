@@ -61,16 +61,13 @@
     </view>
 
     <!-- 空状态 -->
-    <view v-else-if="!loading" class="empty">
-      <text class="empty-icon">
-        📦
-      </text>
-      <text class="empty-text">
-        还没有发布过商品
-      </text>
-      <button class="empty-btn" @click="goPublish">
-        去发布
-      </button>
+    <view v-else-if="!loading">
+      <EmptyState
+        icon="📦"
+        title="还没有发布过商品"
+        action-text="去发布"
+        @action="goPublish"
+      />
     </view>
 
     <!-- 加载更多 -->
@@ -91,6 +88,9 @@
 import { ref } from 'vue';
 import { onShow, onReachBottom } from '@dcloudio/uni-app';
 import { my as myProducts, remove as deleteProduct } from '@/api/product';
+import { useAppStore } from '@/store/app';
+
+const appStore = useAppStore();
 
 /** 状态筛选 Tabs */
 const statusTabs = [
@@ -232,11 +232,14 @@ function goDetail(id) {
 }
 
 /**
- * 跳转编辑（暂未实现编辑页，复用发布页逻辑复杂，先 toast）
+ * 跳转编辑页（复用发布页，预填已有数据）
+ *
+ * publish 页是 tabBar 页面，无法通过 navigateTo 传 query 参数。
+ * 改为写入 appStore.pendingEditProductId → switchTab 跳转。
  */
 function goEdit(id) {
-  // TODO: 编辑页复用发布组件，预填已有数据
-  uni.showToast({ title: '编辑功能即将上线', icon: 'none', duration: 1500 });
+  appStore.setPendingEditProductId(id);
+  uni.switchTab({ url: '/pages/product/publish' });
 }
 
 /**

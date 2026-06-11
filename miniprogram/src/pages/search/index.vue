@@ -163,10 +163,8 @@
           搜索中...
         </text>
       </view>
-      <view v-else-if="list.length === 0 && !loading" class="load-more">
-        <text class="load-more-text">
-          未找到相关商品
-        </text>
+      <view v-else-if="list.length === 0 && !loading">
+        <EmptyState icon="🔍" title="未找到相关商品" />
       </view>
       <view v-else-if="noMore" class="load-more">
         <text class="load-more-text">
@@ -192,6 +190,7 @@ import { onReachBottom, onPullDownRefresh } from '@dcloudio/uni-app';
 import { list as listProducts } from '@/api/product';
 import ProductCard from '@/components/ProductCard.vue';
 import FilterSidebar from '@/components/FilterSidebar.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 // ============================================================
 // 常量

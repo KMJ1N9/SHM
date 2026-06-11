@@ -16,4 +16,22 @@ page {
   -webkit-font-smoothing: antialiased;
 }
 
+// ── 通用页面导航栏 placeholder（多处内联重复，供后续页面复用）──
+// 使用方式：.my-navbar { @extend %page-navbar; }
+//
+// 当前已覆盖页面（内联实现）：chat/list, chat/detail, order/list,
+//   order/detail, notification/index, user/credit, user/reviews
+// 迁移建议：新建页面直接 @extend；现有页面不重构以规避回归风险。
+%page-navbar {
+  padding: 24rpx $space-page;
+  background: $color-surface;
+  border-bottom: 1rpx solid $color-divider;
+
+  &__title {
+    font-size: $text-xl;
+    font-weight: $weight-bold;
+    color: $color-title;
+  }
+}
+
 // ── 工具类（待页面开发时扩展）────────────────────────────────

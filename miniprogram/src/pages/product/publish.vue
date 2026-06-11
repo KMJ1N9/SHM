@@ -9,263 +9,34 @@
           class="progress-step"
           :class="{ active: currentStep >= i, done: currentStep > i }"
         >
-          <view class="step-dot">
-            {{ currentStep > i ? '✓' : i + 1 }}
-          </view>
-          <text class="step-label">
-            {{ step }}
-          </text>
+          <view class="step-dot">{{ currentStep > i ? '✓' : i + 1 }}</view>
+          <text class="step-label">{{ step }}</text>
           <view v-if="i < steps.length - 1" class="step-line" :class="{ filled: currentStep > i }" />
         </view>
       </view>
     </view>
 
-    <!-- ============================================================ -->
-    <!-- Step 1: 上传图片 -->
-    <!-- ============================================================ -->
+    <!-- Step 0: 上传图片 -->
     <view v-if="currentStep === 0" class="step-body">
-      <view class="step-title">
-        上传商品图片
-      </view>
-      <text class="step-hint">
-        清晰的图片能让商品更快卖出（1-6 张）
-      </text>
-
+      <view class="step-title">上传商品图片</view>
+      <text class="step-hint">清晰的图片能让商品更快卖出（1-6 张）</text>
       <ImageUploader ref="uploaderRef" :max-count="6" @update:files="onFilesChange" />
     </view>
 
-    <!-- ============================================================ -->
-    <!-- Step 2: 填写商品信息 -->
-    <!-- ============================================================ -->
-    <view v-if="currentStep === 1" class="step-body">
-      <view class="step-title">
-        填写商品信息
-      </view>
+    <!-- Step 1: 填写商品信息 -->
+    <ProductForm
+      v-if="currentStep === 1"
+      :form="form"
+      @update="onFormUpdate"
+    />
 
-      <view class="form-group">
-        <text class="form-label">
-          商品名称 <text class="required">
-            *
-          </text>
-        </text>
-        <input
-          v-model="form.title"
-          class="form-input"
-          placeholder="例：高等数学第七版（上册）"
-          maxlength="200"
-        >
-      </view>
+    <!-- Step 2: 确认发布 -->
+    <ProductPreview v-if="currentStep === 2" :form="form" />
 
-      <view class="form-group">
-        <text class="form-label">
-          分类 <text class="required">
-            *
-          </text>
-        </text>
-        <view class="category-grid">
-          <view
-            v-for="cat in categories"
-            :key="cat.value"
-            class="category-item"
-            :class="{ selected: form.category === cat.value }"
-            @click="form.category = cat.value"
-          >
-            <text class="category-icon">
-              {{ cat.icon }}
-            </text>
-            <text class="category-text">
-              {{ cat.label }}
-            </text>
-          </view>
-        </view>
-      </view>
-
-      <view class="form-group">
-        <text class="form-label">
-          成色 <text class="required">
-            *
-          </text>
-        </text>
-        <view class="condition-row">
-          <view
-            v-for="c in conditions"
-            :key="c"
-            class="condition-item"
-            :class="{ selected: form.condition === c }"
-            @click="form.condition = c"
-          >
-            {{ c }}
-          </view>
-        </view>
-      </view>
-
-      <view class="form-row">
-        <view class="form-group form-half">
-          <text class="form-label">
-            原价（元）<text class="required">
-              *
-            </text>
-          </text>
-          <input
-            v-model="form.original_price"
-            class="form-input"
-            placeholder="0.00"
-            type="digit"
-          >
-        </view>
-        <view class="form-group form-half">
-          <text class="form-label">
-            售价（元）<text class="required">
-              *
-            </text>
-          </text>
-          <input
-            v-model="form.price"
-            class="form-input"
-            placeholder="0.00"
-            type="digit"
-          >
-        </view>
-      </view>
-
-      <view class="form-group">
-        <text class="form-label">
-          交易地点 <text class="required">
-            *
-          </text>
-        </text>
-        <input
-          v-model="form.trade_location"
-          class="form-input"
-          placeholder="例：图书馆门前 / 1栋宿舍楼下"
-          maxlength="200"
-        >
-      </view>
-
-      <view class="form-group">
-        <view class="form-switch-row">
-          <text class="form-label">
-            支持议价
-          </text>
-          <switch
-            :checked="form.negotiable"
-            color="#4A90D9"
-            @change="(e) => (form.negotiable = e.detail.value)"
-          />
-        </view>
-      </view>
-
-      <view class="form-group">
-        <text class="form-label">
-          商品描述
-        </text>
-        <textarea
-          v-model="form.description"
-          class="form-textarea"
-          placeholder="描述商品的使用情况、购买时间、瑕疵等（选填）"
-          maxlength="2000"
-          :auto-height="true"
-        />
-        <text class="char-count">
-          {{ form.description.length }}/2000
-        </text>
-      </view>
-    </view>
-
-    <!-- ============================================================ -->
-    <!-- Step 3: 确认发布 -->
-    <!-- ============================================================ -->
-    <view v-if="currentStep === 2" class="step-body">
-      <view class="step-title">
-        确认发布
-      </view>
-
-      <!-- 图片预览 -->
-      <view v-if="form.images.length > 0" class="preview-images">
-        <image
-          v-for="(url, i) in form.images"
-          :key="i"
-          class="preview-image"
-          :src="url"
-          mode="aspectFill"
-          @click="previewImages(i)"
-        />
-      </view>
-
-      <!-- 信息预览 -->
-      <view class="preview-info">
-        <view class="preview-title">
-          {{ form.title || '（未填写）' }}
-        </view>
-
-        <view class="preview-row">
-          <text class="preview-label">
-            分类
-          </text>
-          <text class="preview-value">
-            {{ form.category ? (getCategoryLabel(form.category)) : '（未选择）' }}
-          </text>
-        </view>
-
-        <view class="preview-row">
-          <text class="preview-label">
-            成色
-          </text>
-          <text class="preview-value">
-            {{ form.condition || '（未选择）' }}
-          </text>
-        </view>
-
-        <view class="preview-row">
-          <text class="preview-label">
-            价格
-          </text>
-          <view>
-            <text class="preview-price">
-              ¥{{ form.price || '0' }}
-            </text>
-            <text v-if="form.original_price" class="preview-original">
-              原价 ¥{{ form.original_price }}
-            </text>
-          </view>
-        </view>
-
-        <view class="preview-row">
-          <text class="preview-label">
-            交易地点
-          </text>
-          <text class="preview-value">
-            {{ form.trade_location || '（未填写）' }}
-          </text>
-        </view>
-
-        <view class="preview-row">
-          <text class="preview-label">
-            议价
-          </text>
-          <text class="preview-value">
-            {{ form.negotiable ? '支持议价' : '不议价' }}
-          </text>
-        </view>
-
-        <view v-if="form.description" class="preview-desc">
-          <text class="preview-label">
-            描述
-          </text>
-          <text class="preview-desc-text">
-            {{ form.description }}
-          </text>
-        </view>
-      </view>
-    </view>
-
-    <!-- ============================================================ -->
     <!-- 底部操作栏 -->
-    <!-- ============================================================ -->
     <view class="bottom-bar">
-      <!-- Step 0/1: 上一步 + 下一步 -->
       <template v-if="currentStep < 2">
-        <button v-if="currentStep > 0" class="btn btn-prev" @click="prevStep">
+        <button v-if="currentStep > 0 && !isEditMode" class="btn btn-prev" @click="prevStep">
           上一步
         </button>
         <button
@@ -279,18 +50,15 @@
         </button>
       </template>
 
-      <!-- Step 2: 确认发布 -->
       <template v-if="currentStep === 2">
-        <button class="btn btn-prev" :disabled="loading" @click="prevStep">
-          返回修改
-        </button>
+        <button class="btn btn-prev" :disabled="loading" @click="prevStep">返回修改</button>
         <button
           class="btn btn-submit"
           :disabled="loading || submitting"
           :loading="submitting"
           @click="submitPublish"
         >
-          确认发布
+          {{ isEditMode ? '保存修改' : '确认发布' }}
         </button>
       </template>
     </view>
@@ -298,13 +66,22 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
-import { create as createProduct } from '@/api/product';
+import { ref, reactive, computed } from 'vue';
+import { onLoad, onShow } from '@dcloudio/uni-app';
+import { create as createProduct, update as updateProduct, detail as getDetail } from '@/api/product';
 import { chooseAndUpload } from '@/utils/cos';
 import { useUserStore } from '@/store/user';
+import { useAppStore } from '@/store/app';
 import ImageUploader from '@/components/ImageUploader.vue';
+import ProductForm from './components/ProductForm.vue';
+import ProductPreview from './components/ProductPreview.vue';
 
 const userStore = useUserStore();
+const appStore = useAppStore();
+
+/** 编辑模式 */
+const editId = ref(null);
+const isEditMode = computed(() => editId.value !== null);
 
 /** 步骤定义 */
 const steps = ['上传图片', '填写信息', '确认发布'];
@@ -312,10 +89,7 @@ const currentStep = ref(0);
 const loading = ref(false);
 const submitting = ref(false);
 
-/** ImageUploader 组件引用 */
 const uploaderRef = ref(null);
-
-/** 选中的临时文件 */
 const tempFiles = ref([]);
 
 /** 表单数据 */
@@ -328,43 +102,97 @@ const form = reactive({
   price: '',
   trade_location: '',
   negotiable: true,
-  images: [],       // COS URL 列表（上传完成后填充）
+  images: [],
 });
 
-/** 分类选项 */
-const categories = [
-  { value: '电子产品', label: '电子产品', icon: '📱' },
-  { value: '书籍教材', label: '书籍教材', icon: '📚' },
-  { value: '生活用品', label: '生活用品', icon: '🏠' },
-  { value: '服饰鞋包', label: '服饰鞋包', icon: '👗' },
-  { value: '运动户外', label: '运动户外', icon: '⚽' },
-  { value: '其他', label: '其他', icon: '📦' },
-];
+/** ProductForm 数据变更回调 → 同步到父级 form */
+function onFormUpdate(data) {
+  Object.assign(form, data);
+}
 
-/** 成色选项 */
-const conditions = ['全新', '95新', '9成新', '8成新', '7成新及以下'];
-
-/**
- * 图片文件变更回调
- */
 function onFilesChange(files) {
   tempFiles.value = files;
 }
 
-/**
- * 上一步
- */
+/** 重置表单到创建模式 */
+function resetForm() {
+  editId.value = null;
+  currentStep.value = 0;
+  tempFiles.value = [];
+  Object.assign(form, {
+    title: '', description: '', category: '', condition: '',
+    original_price: '', price: '', trade_location: '',
+    negotiable: true, images: [],
+  });
+  if (uploaderRef.value) {
+    uploaderRef.value.clearAll();
+  }
+}
+
+onLoad((options) => {
+  if (options && options.id) {
+    editId.value = parseInt(options.id, 10);
+    uni.setNavigationBarTitle({ title: '编辑商品' });
+    loadExistingProduct(editId.value);
+  }
+});
+
+onShow(() => {
+  const pendingId = appStore.consumePendingEditProductId();
+  if (pendingId !== null && pendingId !== undefined) {
+    resetForm();
+    editId.value = pendingId;
+    uni.setNavigationBarTitle({ title: '编辑商品' });
+    loadExistingProduct(pendingId);
+  } else if (editId.value) {
+    resetForm();
+    uni.setNavigationBarTitle({ title: '发布商品' });
+  }
+});
+
+async function loadExistingProduct(id) {
+  uni.showLoading({ title: '加载中...', mask: true });
+  try {
+    const product = await getDetail(id);
+    if (product.seller_id !== userStore.user?.id) {
+      uni.hideLoading();
+      uni.showToast({ title: '无权编辑此商品', icon: 'none', duration: 1500 });
+      setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 800);
+      return;
+    }
+    if (!['active', 'off_shelf'].includes(product.status)) {
+      uni.hideLoading();
+      uni.showToast({ title: '该状态商品不可编辑', icon: 'none', duration: 1500 });
+      setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 800);
+      return;
+    }
+    Object.assign(form, {
+      title: product.title || '',
+      category: product.category || '',
+      condition: product.condition || '',
+      original_price: product.original_price != null ? String(product.original_price) : '',
+      price: product.price != null ? String(product.price) : '',
+      trade_location: product.trade_location || '',
+      negotiable: product.negotiable !== false,
+      description: product.description || '',
+      images: product.images || [],
+    });
+    currentStep.value = 1;
+    uni.hideLoading();
+  } catch (err) {
+    uni.hideLoading();
+    uni.showToast({ title: err.message || '加载失败', icon: 'none', duration: 1500 });
+    setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 800);
+  }
+}
+
 function prevStep() {
   if (currentStep.value > 0) {
     currentStep.value--;
   }
 }
 
-/**
- * 下一步（含校验 + 上传）
- */
 async function nextStep() {
-  // Step 0 → 1: 检查图片 + 上传
   if (currentStep.value === 0) {
     if (tempFiles.value.length === 0) {
       uni.showToast({ title: '请至少上传一张图片', icon: 'none', duration: 1500 });
@@ -374,16 +202,11 @@ async function nextStep() {
       uni.showToast({ title: '最多上传 6 张图片', icon: 'none', duration: 1500 });
       return;
     }
-
-    // 防重复点击
     if (loading.value) return;
-
-    // 上传图片到 COS（传入 ImageUploader 已选文件，避免重复选图）
     loading.value = true;
     uni.showLoading({ title: '上传图片中...', mask: true });
     try {
       const urls = await chooseAndUpload(tempFiles.value);
-      // hideLoading 必须在 showToast 之前（微信强制要求）
       uni.hideLoading();
       if (urls.length === 0) {
         uni.showToast({ title: '图片上传失败，请重试', icon: 'none', duration: 1500 });
@@ -401,7 +224,6 @@ async function nextStep() {
     return;
   }
 
-  // Step 1 → 2: 校验表单字段
   if (currentStep.value === 1) {
     const err = validateForm();
     if (err) {
@@ -413,43 +235,19 @@ async function nextStep() {
   }
 }
 
-/**
- * 表单字段校验
- * @returns {string|null} 错误信息
- */
 function validateForm() {
-  if (!form.title || !form.title.trim()) {
-    return '请输入商品名称';
-  }
-  if (form.title.trim().length < 1) {
-    return '商品名称至少 1 个字符';
-  }
-  if (!form.category) {
-    return '请选择分类';
-  }
-  if (!form.condition) {
-    return '请选择成色';
-  }
-  if (!form.original_price || parseFloat(form.original_price) < 0) {
-    return '请输入有效的原价';
-  }
-  if (!form.price || parseFloat(form.price) <= 0) {
-    return '请输入有效的售价';
-  }
-  if (parseFloat(form.price) > parseFloat(form.original_price)) {
-    return '售价不能高于原价';
-  }
-  if (!form.trade_location || !form.trade_location.trim()) {
-    return '请输入交易地点';
-  }
+  if (!form.title || !form.title.trim()) return '请输入商品名称';
+  if (form.title.trim().length < 1) return '商品名称至少 1 个字符';
+  if (!form.category) return '请选择分类';
+  if (!form.condition) return '请选择成色';
+  if (!form.original_price || parseFloat(form.original_price) < 0) return '请输入有效的原价';
+  if (!form.price || parseFloat(form.price) <= 0) return '请输入有效的售价';
+  if (parseFloat(form.price) > parseFloat(form.original_price)) return '售价不能高于原价';
+  if (!form.trade_location || !form.trade_location.trim()) return '请输入交易地点';
   return null;
 }
 
-/**
- * 提交发布
- */
 async function submitPublish() {
-  // 信誉分预检（前端 UX 优化，后端仍会二次校验）
   if (!userStore.canPublish) {
     uni.showModal({
       title: '信誉分不足',
@@ -462,7 +260,7 @@ async function submitPublish() {
 
   submitting.value = true;
   try {
-    await createProduct({
+    const payload = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
       category: form.category,
@@ -472,22 +270,30 @@ async function submitPublish() {
       trade_location: form.trade_location.trim(),
       negotiable: form.negotiable,
       images: form.images,
-    });
+    };
 
-    uni.showToast({ title: '发布成功', icon: 'success', duration: 1500 });
+    if (isEditMode.value) {
+      await updateProduct(editId.value, payload);
+      uni.showToast({ title: '保存成功', icon: 'success', duration: 1500 });
+    } else {
+      await createProduct(payload);
+      uni.showToast({ title: '发布成功', icon: 'success', duration: 1500 });
+    }
+
     setTimeout(() => {
-      // 跳转到首页
-      uni.switchTab({ url: '/pages/index/index' });
-    }, 1200);
+      if (isEditMode.value) {
+        const targetId = editId.value;
+        resetForm();
+        uni.setNavigationBarTitle({ title: '发布商品' });
+        uni.navigateTo({ url: `/pages/product/detail?id=${targetId}` });
+      } else {
+        uni.switchTab({ url: '/pages/index/index' });
+      }
+    }, 800);
   } catch (err) {
     const msg = err.message || '发布失败，请稍后重试';
     if (msg.includes('信誉分')) {
-      uni.showModal({
-        title: '发布受限',
-        content: msg,
-        showCancel: false,
-        confirmText: '知道了',
-      });
+      uni.showModal({ title: '发布受限', content: msg, showCancel: false, confirmText: '知道了' });
     } else if (msg.includes('违规') || msg.includes('敏感')) {
       uni.showToast({ title: '内容包含违规信息，请修改后重试', icon: 'none', duration: 2000 });
     } else {
@@ -497,27 +303,9 @@ async function submitPublish() {
     submitting.value = false;
   }
 }
-
-/**
- * 预览大图
- */
-function previewImages(index) {
-  uni.previewImage({
-    current: form.images[index],
-    urls: form.images,
-  });
-}
-
-/**
- * 获取分类标签文本
- */
-function getCategoryLabel(value) {
-  const cat = categories.find((c) => c.value === value);
-  return cat ? `${cat.icon} ${cat.label}` : value;
-}
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 @import '@/styles/tokens.scss';
 
 .publish-page {
@@ -528,7 +316,7 @@ function getCategoryLabel(value) {
   padding-bottom: calc(128rpx + env(safe-area-inset-bottom));
 }
 
-// ── 进度条 ──────────────────────────────────────────────
+// ── 进度条 ──
 .progress-bar {
   background: $color-surface;
   padding: 32rpx $space-page 24rpx;
@@ -544,6 +332,8 @@ function getCategoryLabel(value) {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  position: relative;
+  padding-top: 36rpx;
 }
 
 .step-dot {
@@ -586,11 +376,6 @@ function getCategoryLabel(value) {
   }
 }
 
-.progress-step {
-  position: relative;
-  padding-top: 36rpx;
-}
-
 .step-line {
   width: 80rpx;
   height: 4rpx;
@@ -603,7 +388,7 @@ function getCategoryLabel(value) {
   }
 }
 
-// ── 步骤内容区 ──────────────────────────────────────────
+// ── 步骤内容区 ──
 .step-body {
   flex: 1;
   padding: $space-card $space-page;
@@ -624,219 +409,7 @@ function getCategoryLabel(value) {
   margin-bottom: $space-card;
 }
 
-// ── 表单 ────────────────────────────────────────────────
-.form-group {
-  margin-bottom: $space-card;
-}
-
-.form-label {
-  display: block;
-  font-size: $text-sm;
-  font-weight: $weight-medium;
-  color: $color-title;
-  margin-bottom: 12rpx;
-}
-
-.required {
-  color: $color-error;
-}
-
-.form-input {
-  width: 100%;
-  height: $input-height;
-  border: 1px solid $color-divider;
-  border-radius: $radius-card;
-  padding: 0 24rpx;
-  font-size: $text-base;
-  color: $color-title;
-  background: $color-surface;
-  box-sizing: border-box;
-
-  &:focus {
-    border-color: $color-primary;
-  }
-}
-
-.form-textarea {
-  width: 100%;
-  min-height: 160rpx;
-  border: 1px solid $color-divider;
-  border-radius: $radius-card;
-  padding: 16rpx 24rpx;
-  font-size: $text-base;
-  color: $color-title;
-  background: $color-surface;
-  box-sizing: border-box;
-
-  &:focus {
-    border-color: $color-primary;
-  }
-}
-
-.char-count {
-  display: block;
-  text-align: right;
-  font-size: $text-xs;
-  color: $color-muted;
-  margin-top: 4rpx;
-}
-
-.form-row {
-  display: flex;
-  gap: 24rpx;
-}
-
-.form-half {
-  flex: 1;
-}
-
-.form-switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-// ── 分类选择 ────────────────────────────────────────────
-.category-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
-}
-
-.category-item {
-  width: calc((100% - 32rpx) / 3);
-  padding: 20rpx 0;
-  background: $color-surface;
-  border: 2rpx solid $color-divider;
-  border-radius: $radius-card;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-
-  &.selected {
-    border-color: $color-primary;
-    background: $color-primary-light;
-  }
-}
-
-.category-icon {
-  font-size: 40rpx;
-}
-
-.category-text {
-  font-size: $text-xs;
-  color: $color-body;
-
-  .selected & {
-    color: $color-primary;
-    font-weight: $weight-medium;
-  }
-}
-
-// ── 成色选择 ────────────────────────────────────────────
-.condition-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.condition-item {
-  padding: 12rpx 24rpx;
-  background: $color-surface;
-  border: 2rpx solid $color-divider;
-  border-radius: $radius-card;
-  font-size: $text-sm;
-  color: $color-body;
-
-  &.selected {
-    border-color: $color-primary;
-    background: $color-primary-light;
-    color: $color-primary;
-    font-weight: $weight-medium;
-  }
-}
-
-// ── 预览区（Step 3）──────────────────────────────────────
-.preview-images {
-  display: flex;
-  gap: 12rpx;
-  margin-bottom: $space-card;
-  overflow-x: auto;
-}
-
-.preview-image {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: $radius-card;
-  flex-shrink: 0;
-  background: $color-divider;
-}
-
-.preview-info {
-  background: $color-surface;
-  border-radius: $radius-card;
-  padding: $space-card;
-}
-
-.preview-title {
-  font-size: $text-lg;
-  font-weight: $weight-bold;
-  color: $color-title;
-  margin-bottom: $space-card;
-  padding-bottom: $space-card;
-  border-bottom: 1px solid $color-divider;
-}
-
-.preview-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12rpx 0;
-}
-
-.preview-label {
-  font-size: $text-sm;
-  color: $color-muted;
-  flex-shrink: 0;
-  margin-right: 24rpx;
-}
-
-.preview-value {
-  font-size: $text-sm;
-  color: $color-title;
-  text-align: right;
-}
-
-.preview-price {
-  font-size: $text-lg;
-  font-weight: $weight-bold;
-  color: $color-error;
-  font-family: $font-mono;
-}
-
-.preview-original {
-  font-size: $text-xs;
-  color: $color-muted;
-  text-decoration: line-through;
-  margin-left: 12rpx;
-}
-
-.preview-desc {
-  padding-top: 16rpx;
-  border-top: 1px solid $color-divider;
-  margin-top: 12rpx;
-}
-
-.preview-desc-text {
-  display: block;
-  font-size: $text-sm;
-  color: $color-body;
-  margin-top: 8rpx;
-  line-height: 1.6;
-}
-
-// ── 底部操作栏 ──────────────────────────────────────────
+// ── 底部操作栏 ──
 .bottom-bar {
   position: fixed;
   bottom: 0;

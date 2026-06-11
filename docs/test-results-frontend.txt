@@ -1,0 +1,9 @@
+
+ RUN  v4.1.8 D:/学习资料/AI AGENT/项目/SHM/miniprogram
+
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  17:34:33
+   Duration  539ms (transform 105ms, setup 0ms, import 325ms, tests 20ms, environment 0ms)
+

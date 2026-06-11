@@ -3,7 +3,7 @@ name: known-bugs
 description: 已知 Bug 列表 — 发现时间、位置、根因、修复方案、修复状态
 metadata:
   type: project
-  updatedAt: 2026-06-10T10:00
+  updatedAt: 2026-06-11T23:00
 ---
 
 # 已知 Bug
@@ -457,3 +457,50 @@ metadata:
 - **验证**: ESLint 0 errors；build DONE。
 
 **How to apply:** 发现新 Bug 时按此格式追加。修复后标记 ✅ 并记录修复方案。详见 [[iteration3-audit]] [[iteration4-audit]] [[iteration5-audit]] [[project-state]]。
+
+## BUG-034: 编辑商品 navigateTo 报错 — tabBar 页面不可 navigateTo ✅ 已修复
+
+- **发现时间**: 2026-06-11（第 12 轮真机测试）
+- **修复时间**: 2026-06-11
+- **位置**: [miniprogram/src/pages/product/detail.vue](miniprogram/src/pages/product/detail.vue#L420) / [miniprogram/src/pages/product/my.vue](miniprogram/src/pages/product/my.vue#L234) / [miniprogram/src/store/app.js](miniprogram/src/store/app.js) / [miniprogram/src/pages/product/publish.vue](miniprogram/src/pages/product/publish.vue)
+- **严重程度**: P0（编辑功能完全不可用——点击编辑按钮即报错，页面无响应）
+- **根因**: `pages/product/publish` 在 `pages.json` 中注册为 tabBar 页面，微信小程序禁止 `uni.navigateTo` 跳转 tabBar 页（只能 `uni.switchTab`），而 `switchTab` 不支持 query 参数传递 `?id=123`。
+- **修复（4 文件）**:
+  1. `store/app.js`: 新增 `pendingEditProductId` 状态 + `setPendingEditProductId(id)` / `consumePendingEditProductId()` 两个 action（消费即清空）。
+  2. `pages/product/detail.vue` + `pages/product/my.vue`: `goEdit()` 改为 `appStore.setPendingEditProductId(id)` → `uni.switchTab({ url: '/pages/product/publish' })`。
+  3. `pages/product/publish.vue`: 新增 `onShow` 钩子检查 `appStore.consumePendingEditProductId()`，非 null 则 `resetForm()` + 进入编辑模式；新增 `resetForm()` 函数。
+- **验证**: Build DONE；29 前端测试全绿。
+
+## BUG-035: 编辑保存后 navigateBack 报错 — switchTab 无历史栈 ✅ 已修复
+
+- **发现时间**: 2026-06-11（第 12 轮真机测试，BUG-034 修复后立即发现）
+- **修复时间**: 2026-06-11
+- **位置**: [miniprogram/src/pages/product/publish.vue](miniprogram/src/pages/product/publish.vue) — submitPublish / loadExistingProduct 共 4 处 `uni.navigateBack()`
+- **严重程度**: P0（编辑保存成功后报错 `navigateBack:fail cannot navigate back at first page`，用户无法正常退出编辑流程）
+- **根因**: `switchTab` 跳转到 tabBar 页面不创建导航历史栈条目，`navigateBack()` 无页面可回退。
+- **修复**:
+  1. 保存成功后：`uni.navigateTo({ url: '/pages/product/detail?id=${editId.value}' })` — 跳转到商品详情页查看编辑结果。
+  2. 校验失败（无权/状态不可编辑/加载异常）：`uni.switchTab({ url: '/pages/index/index' })` — 返回首页。
+- **验证**: Build DONE；29 前端测试全绿。
+
+## BUG-036: 编辑保存后 resetForm() 先于 URL 拼接，跳转 "商品不存在" ✅ 已修复
+
+- **发现时间**: 2026-06-11（第 12 轮真机测试，BUG-035 修复后立即发现）
+- **修复时间**: 2026-06-11
+- **位置**: [miniprogram/src/pages/product/publish.vue:597-601](miniprogram/src/pages/product/publish.vue#L597-L601) — submitPublish() 编辑成功分支
+- **严重程度**: P0（编辑保存成功后跳转到 "商品不存在" 页面，用户无法查看编辑结果）
+- **根因**: BUG-035 修复时在 `submitPublish()` 编辑成功分支增加了 `resetForm()` 调用以清理编辑状态。但 `resetForm()` 内部第 360 行 `editId.value = null`，第 601 行 `uni.navigateTo({ url: '/pages/product/detail?id=${editId.value}' })` 拼接出 `/pages/product/detail?id=null`，详情页无法加载商品。
+- **修复**: 先 `const targetId = editId.value` 保存 ID，再 `resetForm()`，最后用 `targetId` 拼 URL。
+- **教训**: 修改共享状态的函数调用后，不可再依赖该状态的值。应先提取到局部变量。
+
+## BUG-037: 编辑保存后发布页被 "保存修改" 状态永久覆盖 ✅ 已修复
+
+- **发现时间**: 2026-06-11（第 12 轮真机测试，BUG-036 修复后立即发现）
+- **修复时间**: 2026-06-11
+- **位置**: [miniprogram/src/pages/product/publish.vue](miniprogram/src/pages/product/publish.vue) — submitPublish() + onShow()
+- **严重程度**: P0（编辑保存后返回首页再点发布 Tab，看到的是 "保存修改" 而非空白的 "发布商品" 页，用户无法再发布新商品）
+- **根因**: tabBar 页面不会销毁，`editId`/`form`/`currentStep` 是 Vue 响应式状态在内存中持久保留。编辑保存后 `navigateTo` 离开时未清理这些状态。下次 `onShow` 时 `consumePendingEditProductId()` 返回 null（已消费），`if` 跳过，页面仍显示编辑模式。
+- **修复（双重防御）**:
+  1. **主动清理**: `submitPublish()` 编辑保存成功后先 `const targetId = editId.value`，再 `resetForm()`，然后 `navigateTo`。
+  2. **被动兜底**: `onShow()` 新增 `else if (editId.value)` 分支——若 pendingId 为 null 但页面仍处于编辑模式，强制 `resetForm()` + 恢复标题。
+- **验证**: Build ✅ / ESLint 0 errors。

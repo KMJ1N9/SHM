@@ -233,6 +233,14 @@
       }
     },
     {
+      "path": "pages/agreement/index",
+      "style": {
+        "navigationBarTitleText": "",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
       "path": "pages/error/not-found",
       "style": {
         "navigationBarTitleText": "404",

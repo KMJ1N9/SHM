@@ -27,6 +27,13 @@ export const useAppStore = defineStore('app', {
 
     /** @type {boolean} 是否允许通知轮询（退出登录时置 false 停止轮询） */
     shouldPoll: true,
+
+    /**
+     * 待编辑商品 ID（tabBar 页面无法通过 query 传参，用 store 中转）。
+     * publish.vue 的 onShow 会检查此字段，若不为 null 则进入编辑模式并消费掉。
+     * @type {number|null}
+     */
+    pendingEditProductId: null,
   }),
 
   getters: {
@@ -68,6 +75,18 @@ export const useAppStore = defineStore('app', {
     /** 设置是否允许轮询（退出登录时置 false） */
     setShouldPoll(value) {
       this.shouldPoll = value;
+    },
+
+    /** 设置待编辑商品 ID（tabBar 路由传参中转） */
+    setPendingEditProductId(id) {
+      this.pendingEditProductId = id;
+    },
+
+    /** 消费并清除待编辑商品 ID */
+    consumePendingEditProductId() {
+      const id = this.pendingEditProductId;
+      this.pendingEditProductId = null;
+      return id;
     },
   },
 });

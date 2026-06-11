@@ -35,11 +35,19 @@ export function getReviewsByOrder(orderId) {
 
 /**
  * 获取某用户的评价列表（含三维度平均分统计）
+ *
+ * 支持两种分页模式：
+ * - 偏移分页：传 page/pageSize
+ * - 游标分页：传 cursor/limit，返回 { summary, list, total, cursor, hasMore }
+ *   游标 = 上一页最后一条 id，首页传 cursor=null 或不传
+ *
  * @param {number} userId - 用户 ID
  * @param {Object} [params]
- * @param {number} [params.page]     - 页码，默认 1
- * @param {number} [params.pageSize] - 每页条数，默认 20
- * @returns {Promise<{summary: {total: number, avg_communication: number, avg_punctuality: number, avg_accuracy: number}, list: Array, total: number}>}
+ * @param {number} [params.page]     - 页码（偏移分页），默认 1
+ * @param {number} [params.pageSize] - 每页条数（偏移分页），默认 20
+ * @param {number} [params.cursor]   - 游标（游标分页），上一页最后一条 id
+ * @param {number} [params.limit]    - 每页条数（游标分页），默认 20
+ * @returns {Promise<{summary: Object, list: Array, total: number, cursor?: number, hasMore?: boolean}>}
  */
 export function getUserReviews(userId, params) {
   return get('/reviews', { user_id: userId, ...params });

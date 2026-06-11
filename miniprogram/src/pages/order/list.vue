@@ -120,8 +120,9 @@
 /**
  * 订单列表页 — 按状态 Tab 筛选，显示我作为买家/卖家的全部订单
  *
- * 数据源：getOrderList({ status, page, pageSize })
- * Tab 切换时重置分页并重新拉取
+ * 使用游标分页（cursor/limit）替代偏移分页（page/pageSize），
+ * O(1) 定位避免 OFFSET 大页码退化。
+ * 游标 = 上一页最后一条 id，首页传 null。
  */
 
 import { ref, onMounted } from 'vue';
@@ -160,27 +161,31 @@ const orders = ref([]);
 const loading = ref(true);
 const refreshing = ref(false);
 const loadingMore = ref(false);
-const page = ref(1);
-const pageSize = 20;
+const cursor = ref(null);
+const limit = 20;
 const hasMore = ref(true);
 
 // ============================================================
 // 数据加载
 // ============================================================
 async function fetchOrders(reset = false) {
-  // 先计算目标页码，成功后再持久化 — 防止请求失败时跳过一整页
-  const targetPage = reset ? 1 : page.value + 1;
-
   if (reset) {
+    cursor.value = null;
     hasMore.value = true;
   }
 
+  if (!reset && !hasMore.value) return;
+
   try {
-    const result = await getOrderList({
+    const params = {
+      limit,
       status: activeStatus.value || undefined,
-      page: targetPage,
-      pageSize,
-    });
+    };
+    if (!reset && cursor.value) {
+      params.cursor = cursor.value;
+    }
+
+    const result = await getOrderList(params);
 
     // 预处理：预解析 product_snapshot 避免模板中重复 JSON.parse
     const parsed = (result.list || []).map(order => {
@@ -203,12 +208,8 @@ async function fetchOrders(reset = false) {
       orders.value.push(...parsed);
     }
 
-    // 请求成功后才推进页码
-    page.value = targetPage;
-
-    // 判断是否还有更多
-    const listLen = (result.list || []).length;
-    hasMore.value = listLen >= pageSize;
+    cursor.value = result.cursor || null;
+    hasMore.value = result.hasMore ?? false;
   } catch (err) {
     uni.showToast({ title: err.message || '加载失败', icon: 'none' });
   }

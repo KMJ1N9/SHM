@@ -114,6 +114,71 @@ const reviewRepo = {
       total: summary.total || 0,
     };
   },
+
+  /**
+   * 游标分页查询用户评价列表
+   *
+   * 基于 id DESC 的游标分页，O(1) 定位，避免 OFFSET 大页码退化。
+   * 游标值 = 上一页最后一条记录的 id，首页传 null。
+   * 聚合统计始终为全量（不含 cursor 条件）。
+   *
+   * @param {number} userId - 被评价人 ID
+   * @param {Object} filters - { cursor?, limit }
+   * @returns {Promise<{summary: Object, list: Array, total: number, cursor: number|null, hasMore: boolean}>}
+   */
+  async listByCursor(userId, filters = {}) {
+    const cursor = filters.cursor ? parseInt(filters.cursor, 10) : null;
+    const limit = Math.min(50, Math.max(1, parseInt(filters.limit, 10) || 20));
+
+    // 聚合统计（全量，不含 cursor 条件）
+    const [summary] = await query(
+      `SELECT
+         COUNT(*) AS total,
+         ROUND(AVG(communication_score), 1) AS avg_communication,
+         ROUND(AVG(punctuality_score), 1) AS avg_punctuality,
+         ROUND(AVG(accuracy_score), 1) AS avg_accuracy
+       FROM reviews WHERE reviewee_id = ?`,
+      [userId]
+    );
+
+    // 列表（含 cursor 条件）
+    const dataConditions = ['r.reviewee_id = ?'];
+    const dataParams = [userId];
+    if (cursor) {
+      dataConditions.push('r.id < ?');
+      dataParams.push(cursor);
+    }
+
+    const rows = await query(
+      `SELECT r.id, r.communication_score, r.punctuality_score, r.accuracy_score,
+              r.comment, r.created_at,
+              reviewer.id AS reviewer_id, reviewer.nickname AS reviewer_nickname,
+              reviewer.avatar AS reviewer_avatar
+       FROM reviews r
+       JOIN users reviewer ON r.reviewer_id = reviewer.id
+       WHERE ${dataConditions.join(' AND ')}
+       ORDER BY r.id DESC
+       LIMIT ?`,
+      [...dataParams, limit + 1]
+    );
+
+    const hasMore = rows.length > limit;
+    const list = rows.slice(0, limit);
+    const nextCursor = list.length > 0 ? list[list.length - 1].id : null;
+
+    return {
+      summary: {
+        total: summary.total || 0,
+        avg_communication: summary.avg_communication || 0,
+        avg_punctuality: summary.avg_punctuality || 0,
+        avg_accuracy: summary.avg_accuracy || 0,
+      },
+      list,
+      total: summary.total || 0,
+      cursor: hasMore ? nextCursor : null,
+      hasMore,
+    };
+  },
 };
 
 module.exports = reviewRepo;

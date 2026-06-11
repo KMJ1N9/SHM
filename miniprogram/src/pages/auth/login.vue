@@ -79,7 +79,7 @@
           <text class="privacy-link" @click.stop="openPrivacy">
             《用户协议》
           </text>
-          <text class="privacy-link" @click.stop="openPrivacy">
+          <text class="privacy-link" @click.stop="openPrivacyPolicy">
             《隐私政策》
           </text>
         </text>
@@ -146,10 +146,17 @@ function toggleAgreement() {
 }
 
 /**
- * 打开隐私协议页面（TODO: 替换为真实协议页面路径）
+ * 打开用户协议页面
  */
 function openPrivacy() {
-  uni.showToast({ title: '协议页面开发中', icon: 'none', duration: 1500 });
+  uni.navigateTo({ url: '/pages/agreement/index?type=user' });
+}
+
+/**
+ * 打开隐私政策页面
+ */
+function openPrivacyPolicy() {
+  uni.navigateTo({ url: '/pages/agreement/index?type=privacy' });
 }
 
 /**

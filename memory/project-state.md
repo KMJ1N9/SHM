@@ -1,17 +1,19 @@
 ---
 name: project-state
-description: 项目当前状态 — 第 11 轮全部完成 ✅（LRU 缓存 + 游标分页），143 后端测试通过，审查 9.5/10
+description: 项目当前状态 — 第 13 轮全部完成 ✅（6 Phase），236 测试全绿（后端 207 + 前端 29），CI/CD 就绪
 metadata:
   type: project
-  updatedAt: 2026-06-11T18:15
-  currentIteration: 11
-  testedIteration: 11
+  updatedAt: 2026-06-11
+  currentIteration: 13
+  testedIteration: 13
+  nextIteration: 14 (前端大文件拆分 + 生产部署)
+  round13PhaseCount: 6 (Phase 1~6 全部完成)
 ---
 
 # 项目当前状态
 
 **评估日期：** 2026-06-11
-**阶段：** 第 9 轮（收尾补全 + P1 修复 + 通知/信誉分收尾）完成 ✅
+**阶段：** 第 12 轮（前端收尾）完成 ✅，全部 12 轮编码完成
 
 ## 迭代进度总览
 
@@ -32,6 +34,8 @@ metadata:
 | 9 | 收尾补全 + P1 修复 | ✅ | 12 (7 页面 + 1 API + 4 修改) | 7/7 P1 修复 | 2026-06-11 |
 | 10 | 工程化基础审计 | ✅ | 11 (2 console.log 替换 + 1 bare Error 替换 + 6 business 日志补全 + 1 脱敏 + 1 文档) | 26 business 日志点 | 2026-06-11 |
 | 11 | 缓存 + 性能 | ✅ 已完成 | 9 (5 后端修改 + 1 前端修改 + 1 测试增强 + 2 文档) | 0 (139/139 全绿) | 2026-06-11 |
+| 12 | 前端收尾 | ✅ 已完成 | 21 (4 后端修改 + 13 前端修改 + 4 测试新建) | 0 (143 后端 + 29 前端全绿) | 2026-06-11 |
+| 13 | 测试 + CI + 部署 | ✅ 已完成 | 16 (8 测试文件 + 4 基础设施 + 2 审核文档 + 1 审计 + 1 CI) | 0 (207 后端 + 29 前端全绿) | 2026-06-11 |
 
 ## 第 7 轮：举报/管理后台/互评增强 ✅
 
@@ -82,14 +86,12 @@ metadata:
 - **JWT 双 Token**：access + refresh，无感刷新拦截器已就绪
 - **IM**：腾讯云 IM Provider 抽象层已就绪，前端 SDK 待集成
 
-## 已知待办（非阻塞）
+## 已知待办
 
 | 项 | 优先级 | 说明 |
 |----|:--:|------|
-| 编辑商品页面 | P1 | 复用 publish 组件 + 预填数据 |
-| 前端测试用例 | P1 | 编码阶段随功能补齐 |
 | Sass @import → @use | P2 | 弃用警告，不阻塞 |
-| Math.random() in COS key | P2 | MVP 可接受，后续改 UUID |
+| BUG-014 顽固缓存 | P2 | 微信开发者工具缓存 example.com 图片报错，不影响功能 |
 
 ## 下一步
 
@@ -341,10 +343,13 @@ metadata:
 | 层 | 完成度 | 说明 |
 |------|:--:|------|
 | 后端 server/src/ | **~98%** | 57 文件 5 层完整，scheduler 4 cron 全实现，第 10 轮工程化审计通过 |
-| 前端 miniprogram/src/ | **~82%** | 24/25 页面完成（仅 search 为 stub），6 组件 + 7 API 模块 |
+| 前端 miniprogram/src/ | **~85%** | 25/25 页面全部完成，6 组件 + 7 API 模块 + 29 前端测试 |
 | 数据库 | **100%** | 14 表 + 5 迁移 + 种子数据 |
-| 测试 | **~42%** | 10 文件 139 用例全部通过（+8 缓存测试） |
-| 文档 | **100%** | 16 份文档全部完成，7 轮审阅 95 问题清零 |
+| 测试 | **~50%** | 20 文件 236 用例全部通过（后端 18 文件 207 用例 + 前端 2 文件 29 用例） |
+| 文档 | **100%** | 18 份文档全部完成，7 轮审阅 95 问题清零 |
+| CI/CD | **100%** | `.github/workflows/ci.yml` — 4 Job（backend-test/frontend-test/lint/build） |
+| 部署 | **100%** | PM2 ecosystem.config.js + nginx.conf + 运维手册 12 章 |
+| 审核 | **100%** | 测试账号 + 审核说明 + 协议页（截图需人工截取） |
 
 ## 第 10 轮：工程化基础审计 ✅（2026-06-11）
 
@@ -406,10 +411,220 @@ metadata:
 
 ---
 
+## 第 12 轮：前端收尾 ✅（2026-06-11）
+
+**性质：** 5 Phase 收尾轮。协议合规/编辑商品/游标分页扩展/EmptyState 组件化/前端测试补齐。
+
+**产出总览：**
+
+| Phase | 内容 | 文件数 | 状态 |
+|:--:|------|:--:|:--:|
+| 1 | 用户协议/隐私政策内容页 (P0) | 4 (新建 1 + 修改 3) | ✅ |
+| 2 | 编辑商品页面 (P1) | 3 (修改 3) | ✅ |
+| 3 | 游标分页扩展到订单+评价列表 (P2) | 6 (后端 4 修改 + 前端 4 修改) | ✅ |
+| 4 | P2 收尾 (EmptyState组件化 + CSS审计) | 4 (修改 4) | ✅ |
+| 5 | 前端测试补齐 (P1) | 4 (新建 4) | ✅ |
+
+**Phase 1 — 协议内容页：**
+| 文件 | 操作 | 关键功能 |
+|------|:--:|------|
+| `utils/agreement.js` | 新建 | USER_AGREEMENT + PRIVACY_POLICY 常量，单一事实源 |
+| `pages/agreement/index.vue` | 新建 | 协议展示页：`?type=user\|privacy` 动态标题 + scroll-view 长文本 |
+| `pages/auth/login.vue` | 修改 | 拆分为 openPrivacy() / openPrivacyPolicy() 两个独立跳转 |
+| `pages/user/settings.vue` | 修改 | showAgreement() 从 Modal 改为 navigateTo 跳转 |
+| `pages.json` | 修改 | 注册 agreement 路由 |
+
+**Phase 2 — 编辑商品页面：**
+| 文件 | 操作 | 关键功能 |
+|------|:--:|------|
+| `pages/product/publish.vue` | 修改 | 创建/编辑双模式：`?id=123` 触发编辑 → onLoad 加载+预填 → isEditMode 控制提交 API 和导航按钮文案 |
+| `pages/product/detail.vue` | 修改 | 卖家视角新增"编辑"按钮（active/off_shelf 状态可编辑） |
+| `pages/product/my.vue` | 修改 | goEdit() 从占位 toast 改为 navigateTo publish |
+
+**Phase 3 — 游标分页扩展：**
+| 文件 | 操作 | 关键功能 |
+|------|:--:|------|
+| `server/src/repository/order.js` | 修改 | 新增 listByCursor() — WHERE id < cursor ORDER BY id DESC |
+| `server/src/services/order.js` | 修改 | list() 自动路由：cursor/limit → listByCursor，page/pageSize → findByUser |
+| `server/src/repository/review.js` | 修改 | 新增 listByCursor() — 含 summary 聚合统计 |
+| `server/src/services/review.js` | 修改 | listByUser() 自动路由，同上模式 |
+| `api/order.js` | 修改 | JSDoc 新增 cursor/limit 参数文档 |
+| `api/review.js` | 修改 | JSDoc 新增 cursor/limit 参数文档 |
+| `pages/order/list.vue` | 修改 | page/noMore → cursor/hasMore：fetchOrders 用 cursor/limit 替代 page/pageSize |
+| `pages/user/reviews.vue` | 修改 | 同上：fetchReviews 用 cursor/limit 替代 page/pageSize |
+
+**Phase 4 — P2 收尾：**
+| 文件 | 操作 | 关键功能 |
+|------|:--:|------|
+| `pages/search/index.vue` | 修改 | "未找到相关商品" → `<EmptyState>` |
+| `pages/notification/index.vue` | 修改 | 空通知列表 → `<EmptyState>` |
+| `pages/product/my.vue` | 修改 | 空发布列表 → `<EmptyState>` |
+| `styles/common.scss` | 修改 | 新增 %page-navbar placeholder（供未来页面复用，不改动现有页面） |
+
+**Phase 5 — 前端测试补齐：**
+| 文件 | 操作 | 关键功能 |
+|------|:--:|------|
+| `__tests__/mocks/uni.js` | 新建 | uni Storage API mock（get/set/removeStorageSync） |
+| `__tests__/utils/im.test.js` | 新建 | 9 用例：cachePeerProfile/getPeerProfile/覆盖保护/空参/损坏降级 |
+| `__tests__/store/user.test.js` | 新建 | 20 用例：isLoggedIn/creditScore/canPublish/canTrade/isAdmin/isCS 边界值全覆盖 |
+| `vitest.config.js` | 新建 | vitest 配置：@ alias + globals |
+
+**验证结果：**
+- 后端：`npx vitest run` 10 文件 143 用例全绿（新增 0 后端测试，服务层路由变更不破坏 API 契约）
+- 前端：`npx vitest run` 2 文件 29 用例全绿
+- 前端 ESLint：0 errors（仅预先存在的 console 警告）
+- 前端 Build：DONE（mp-weixin）
+
+**架构决策：**
+- 编辑商品复用 publish.vue（双模式）而非新建页面 → 减少代码重复
+- 编辑模式跳过图片重新上传（保持现有图片不变）→ 避免 ImageUploader 初始文件重构
+- 协议页使用系统导航栏（非 AppNavbar）→ 避免 back 按钮颜色硬编码问题
+- 游标分页 COUNT 不含 cursor 条件 → 总数统计全部匹配行
+- 游标分页取 limit+1 条判断 hasMore → 经典 hasMore 模式
+- CSS 审计仅添加 mixin，不改动现有页面 → 最小化回归风险
+
+**详细计划：** [[../plans/iteration12-frontend-polish.md]]（5 Phase ~7h）
+
+**真机测试 Bug 修复（4 个连环 Bug）：**
+
+| Bug | 级别 | 简述 | 位置 |
+|-----|:--:|------|------|
+| BUG-034 | P0 | 编辑商品 navigateTo 报错 — publish 是 tabBar 页，不能用 navigateTo | detail.vue + my.vue + store/app.js + publish.vue |
+| BUG-035 | P0 | 编辑保存后 navigateBack 报错 — switchTab 无历史栈 | publish.vue (4 处 navigateBack) |
+| BUG-036 | P0 | resetForm() 先于 URL 拼接，跳转 "商品不存在" — editId 被清空后才拼 URL | publish.vue submitPublish() |
+| BUG-037 | P0 | 编辑保存后发布页被 "保存修改" 永久覆盖 — 状态未清理 | publish.vue submitPublish() + onShow() |
+
+**修复涉及文件：** store/app.js（+13 行）+ publish.vue（+30 行）+ detail.vue（+3 行）+ my.vue（+4 行）
+**详细记录：** [[known-bugs]] BUG-034~037
+
+---
+
+---
+
+## 第 13 轮：测试 + CI + 部署 ✅（2026-06-11）
+
+**性质：** 6 Phase 收尾轮。测试补全 → CI 流水线 → 部署验证 → 压力测试 → Ship-Gate 审计 → 审核材料。
+
+**产出总览：**
+
+| Phase | 内容 | 优先级 | 状态 | 产出 |
+|:--:|------|:--:|:--:|------|
+| 1 | 后端测试缺口补全 | 🟡 P1 | ✅ | 8 测试文件 55 用例（auth/credit/notification service + auth/rate-limiter/validate middleware + auth/orders 集成） |
+| 2 | GitHub Actions CI 流水线 | 🟡 P1 | ✅ | `.github/workflows/ci.yml`（4 Job：backend-test + frontend-test + lint + build） |
+| 3 | PM2 + nginx + 运维文档 | 🟡 P1 | ✅ | `server/nginx.conf` 创建；PM2 config 与运维手册已完善 |
+| 4 | 压力测试基线 | 🟢 P2 | ✅ | `server/scripts/benchmark.sh` + `docs/benchmark-results.md` 模板 |
+| 5 | Ship-Gate 最终审计 | 🔴 P0 | ✅ | 89 项检查 → `memory/ship-gate-audit.md`（⚠️ Go with Warnings：4 警告，0 阻塞） |
+| 6 | 微信审核材料 | 🔴 P0 | ✅ | `docs/wechat-review-account.md` + `docs/wechat-review-notes.md`（截图需人工截取） |
+
+### Phase 1 — 后端测试补全（8 文件 55 用例）
+
+| 文件 | 类型 | 用例 | 覆盖模块 |
+|------|:--:|:--:|------|
+| `__tests__/unit/services/auth.test.js` | 单元 | 10 | login/refreshToken/getMe/logout（real DB） |
+| `__tests__/unit/services/credit.test.js` | 单元 | 6 | my/userPublic/changeScore（real DB） |
+| `__tests__/unit/services/notification.test.js` | 单元 | 6 | list/unreadCount/read/readAll（real DB） |
+| `__tests__/unit/middleware/auth.test.js` | 单元 | 8 | 白名单/Token提取/JWT验证/token_version/banned（real DB） |
+| `__tests__/unit/middleware/rate-limiter.test.js` | 单元 | 5 | TokenBucket/globalLimiter/sensitiveLimiter（纯逻辑） |
+| `__tests__/unit/middleware/validate.test.js` | 单元 | 6 | validateBody/validateQuery/validateParams（纯 Joi） |
+| `__tests__/integration/auth.test.js` | 集成 | 9 | login→refresh→me 全流程 |
+| `__tests__/integration/orders.test.js` | 集成 | 14 | 创建→列表→详情→面交→确认→取消 状态机全路径 |
+
+**测试策略：** 所有 service/middleware 测试使用项目 real-DB 模式（`setupTestDb()` + `createTestUser()`），无 `vi.mock()` 模块替换。CI 环境使用 MySQL 8.0 服务容器。
+
+**验证结果：** `npx vitest run` 18 文件 207 用例全绿（后端），`npx vitest run` 2 文件 29 用例全绿（前端），合计 20 文件 236 用例 0 failures。
+
+**修复的重要问题：**
+- `server/src/services/auth.js:47` — mock code 条件扩展为 `NODE_ENV === 'development' || NODE_ENV === 'test'`（集成测试 502 问题）
+- `tokenVersionMismatch()` 错误码为 1003（测试中误写为 1002）
+- `validate.js` 错误消息为 Joi detail（非固定"请求参数错误"）
+- CJS+globals 模式下 `vi.mock()` 在 top-level 无法正常工作 → 全改 real-DB 模式
+
+### Phase 2 — CI 流水线
+
+**文件：** `.github/workflows/ci.yml`
+
+| Job | 内容 | 环境 |
+|:--:|------|------|
+| backend-test | `cd server && npm ci && npx vitest run` | ubuntu-latest + MySQL 8.0 service container |
+| frontend-test | `cd miniprogram && npm ci && npx vitest run` | ubuntu-latest |
+| lint | ESLint (server + miniprogram) `\|\| true` | ubuntu-latest |
+| build | `npm run build:mp-weixin` | ubuntu-latest |
+
+### Phase 3 — 部署验证
+
+| 产出 | 说明 |
+|------|------|
+| `server/nginx.conf` | nginx 反向代理 + HTTPS + 安全头 + 静态资源缓存 + HTTP→HTTPS 重定向 |
+| `server/ecosystem.config.js` | 审查通过（fork 模式/单实例/256M/日志轮转/优雅退出） |
+| `server/.env.production` | 已存在（2605 字节，配置完整） |
+
+### Phase 4 — 压力测试
+
+| 产出 | 说明 |
+|------|------|
+| `server/scripts/benchmark.sh` | 4 组 ab 压测：health(5k/200) + 列表(1k/50) + 详情(2k/100) + 搜索(500/30) |
+| `docs/benchmark-results.md` | 结果模板（需在生产环境执行后填入实际数据） |
+
+### Phase 5 — Ship-Gate 审计
+
+**结论：⚠️ Go with Warnings** — 4 个警告项，0 个阻塞项。
+
+| 警告 | 等级 | 说明 |
+|------|:--:|------|
+| npm audit: 3 critical | ⚠️ | cos-nodejs-sdk-v5 传递依赖（qs/tough-cookie/uuid） |
+| 前端大文件 3 个超 500 行 | ⚠️ | order/detail.vue (1360) + publish.vue (1019) + detail.vue (854) |
+| TODO 1 个 | ⚠️ | auth.js:45 — mock WeChat API → 真实接口 |
+| 未在 Linux 生产服务器实测 PM2 | ⚠️ | 开发机为 Windows，无法本地验证 |
+
+**详细报告：** [[ship-gate-audit]]
+
+### Phase 6 — 审核材料
+
+| 产出 | 说明 |
+|------|------|
+| `docs/wechat-review-account.md` | 3 个测试账号 + 建议测试流程 |
+| `docs/wechat-review-notes.md` | 功能概述 + 类目说明 + 安全机制 + 隐私保护 + 技术架构 + 审核说明 |
+| 5 张功能截图 | 🔲 需人工在微信开发者工具或真机截取 |
+
+### 本轮新建文件清单（16 个）
+
+| # | 文件 | Phase |
+|:--:|------|:--:|
+| 1 | `server/__tests__/unit/services/auth.test.js` | 1 |
+| 2 | `server/__tests__/unit/services/credit.test.js` | 1 |
+| 3 | `server/__tests__/unit/services/notification.test.js` | 1 |
+| 4 | `server/__tests__/unit/middleware/auth.test.js` | 1 |
+| 5 | `server/__tests__/unit/middleware/rate-limiter.test.js` | 1 |
+| 6 | `server/__tests__/unit/middleware/validate.test.js` | 1 |
+| 7 | `server/__tests__/integration/auth.test.js` | 1 |
+| 8 | `server/__tests__/integration/orders.test.js` | 1 |
+| 9 | `.github/workflows/ci.yml` | 2 |
+| 10 | `server/nginx.conf` | 3 |
+| 11 | `server/scripts/benchmark.sh` | 4 |
+| 12 | `docs/benchmark-results.md` | 4 |
+| 13 | `memory/ship-gate-audit.md` | 5 |
+| 14 | `docs/wechat-review-account.md` | 6 |
+| 15 | `docs/wechat-review-notes.md` | 6 |
+| 16 | `plans/iteration13-test-ci-deploy.md` | — |
+
+### 本轮修改文件清单（3 个）
+
+| # | 文件 | 说明 |
+|:--:|------|------|
+| 1 | `server/src/services/auth.js` | mock code 条件扩展至 test 环境 |
+| 2 | `memory/project-state.md` | 第 13 轮进度记录 + 代码状态更新 |
+| 3 | `memory/MEMORY.md` | 索引更新 |
+
+---
+
 ## 下一步
 
-**第 12 轮候选（编码迭代计划）：前端收尾**
-- 搜索页面完善
-- 编辑商品页面
-- 前端测试补齐
-- 游标分页扩展到其他列表页
+**第 14 轮：生产部署 + 前端文件拆分 🔲**
+
+计划重点：
+1. 前端大文件拆分：order/detail.vue (1360行) + publish.vue (1019行) + product/detail.vue (854行)
+2. 生产 Linux 服务器部署验证（PM2 + nginx + MySQL）
+3. 全链路真机烟雾测试
+4. 微信小程序提交审核
+5. `npm audit fix` — 关注 cos-nodejs-sdk-v5 更新
+6. 5 张审核功能截图截取

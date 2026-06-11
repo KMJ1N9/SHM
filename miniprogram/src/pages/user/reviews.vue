@@ -173,8 +173,10 @@
 /**
  * 评价记录页 — 三维度汇总统计 + 评价列表
  *
- * 数据源：getUserReviews(userId, { page, pageSize })
- * 返回 { summary: { total, avg_communication, avg_punctuality, avg_accuracy }, list, total }
+ * 使用游标分页（cursor/limit）替代偏移分页（page/pageSize），
+ * O(1) 定位避免 OFFSET 大页码退化。
+ * 游标 = 上一页最后一条 id，首页传 null。
+ * summary 聚合统计始终为全量，不受 cursor 影响。
  */
 
 import { ref, onMounted } from 'vue';
@@ -192,8 +194,8 @@ const loading = ref(true);
 const errorMsg = ref('');
 const refreshing = ref(false);
 const loadingMore = ref(false);
-const page = ref(1);
-const pageSize = 20;
+const cursor = ref(null);
+const limit = 20;
 const hasMore = ref(true);
 
 const userStore = useUserStore();
@@ -202,18 +204,20 @@ const userStore = useUserStore();
 // 数据加载
 // ============================================================
 async function fetchReviews(reset = false) {
-  // 先计算目标页码，成功后再持久化 — 防止请求失败时跳过一整页
-  const targetPage = reset ? 1 : page.value + 1;
-
   if (reset) {
+    cursor.value = null;
     hasMore.value = true;
   }
 
+  if (!reset && !hasMore.value) return;
+
   try {
-    const result = await getUserReviews(userStore.user.id, {
-      page: targetPage,
-      pageSize,
-    });
+    const params = { limit };
+    if (!reset && cursor.value) {
+      params.cursor = cursor.value;
+    }
+
+    const result = await getUserReviews(userStore.user.id, params);
 
     summary.value = result.summary || null;
 
@@ -223,10 +227,8 @@ async function fetchReviews(reset = false) {
       reviews.value.push(...(result.list || []));
     }
 
-    // 请求成功后才推进页码
-    page.value = targetPage;
-
-    hasMore.value = (result.list || []).length >= pageSize;
+    cursor.value = result.cursor || null;
+    hasMore.value = result.hasMore ?? false;
   } catch (err) {
     uni.showToast({ title: err.message || '加载失败', icon: 'none' });
   }

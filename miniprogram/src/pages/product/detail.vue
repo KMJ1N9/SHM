@@ -2,168 +2,82 @@
   <view class="detail-page">
     <!-- 加载中 -->
     <view v-if="loading" class="detail-loading">
-      <text class="loading-text">
-        加载中...
-      </text>
+      <text class="loading-text">加载中...</text>
     </view>
 
     <!-- 加载失败 -->
     <view v-else-if="errorMsg" class="detail-error">
-      <text class="error-icon">
-        😕
-      </text>
-      <text class="error-text">
-        {{ errorMsg }}
-      </text>
-      <button class="retry-btn" @click="loadDetail">
-        重新加载
-      </button>
+      <text class="error-icon">😕</text>
+      <text class="error-text">{{ errorMsg }}</text>
+      <button class="retry-btn" @click="loadDetail">重新加载</button>
     </view>
 
     <!-- 内容 -->
     <template v-else-if="product">
       <!-- 图片轮播 -->
-      <view class="image-swiper">
-        <swiper
-          class="swiper"
-          :indicator-dots="product.images && product.images.length > 1"
-          indicator-color="rgba(255,255,255,0.5)"
-          indicator-active-color="#FFFFFF"
-          :autoplay="false"
-          circular
-        >
-          <swiper-item v-for="(url, i) in product.images" :key="i">
-            <SafeImage
-              class="swiper-image"
-              :src="resolveImageUrl(url)"
-              mode="aspectFill"
-              @click="previewImages(i)"
-            />
-          </swiper-item>
-        </swiper>
-        <!-- 图片计数 -->
-        <view v-if="product.images && product.images.length > 1" class="image-count">
-          <text>{{ product.images.length }} 张图片</text>
-        </view>
-      </view>
+      <ProductSwiper
+        :images="product.images || []"
+        :resolve-url="resolveImageUrl"
+      />
 
       <!-- 价格区 -->
       <view class="price-section">
         <view class="price-row">
-          <text class="price-current">
-            ¥{{ formatPrice(product.price) }}
-          </text>
+          <text class="price-current">¥{{ formatPrice(product.price) }}</text>
           <text v-if="product.original_price && product.original_price > product.price" class="price-original">
             ¥{{ formatPrice(product.original_price) }}
           </text>
         </view>
         <view class="price-status">
-          <text class="status-tag" :class="'status-' + product.status">
-            {{ statusLabel(product.status) }}
-          </text>
+          <text class="status-tag" :class="'status-' + product.status">{{ statusLabel(product.status) }}</text>
         </view>
       </view>
 
       <!-- 标题 -->
       <view class="title-section">
-        <text class="product-title">
-          {{ product.title }}
-        </text>
+        <text class="product-title">{{ product.title }}</text>
       </view>
 
       <!-- 标签区 -->
       <view class="tags-section">
-        <text class="tag tag-condition">
-          {{ product.condition }}
-        </text>
-        <text class="tag tag-category">
-          {{ product.category }}
-        </text>
-        <text v-if="product.negotiable" class="tag tag-negotiable">
-          可议价
-        </text>
+        <text class="tag tag-condition">{{ product.condition }}</text>
+        <text class="tag tag-category">{{ product.category }}</text>
+        <text v-if="product.negotiable" class="tag tag-negotiable">可议价</text>
       </view>
 
       <!-- 描述 -->
       <view v-if="product.description" class="desc-section">
-        <text class="section-title">
-          商品描述
-        </text>
-        <text class="desc-text">
-          {{ product.description }}
-        </text>
+        <text class="section-title">商品描述</text>
+        <text class="desc-text">{{ product.description }}</text>
       </view>
 
       <!-- 交易信息 -->
       <view class="info-section">
-        <text class="section-title">
-          交易信息
-        </text>
+        <text class="section-title">交易信息</text>
         <view class="info-row">
-          <text class="info-label">
-            📍 交易地点
-          </text>
-          <text class="info-value">
-            {{ product.trade_location }}
-          </text>
+          <text class="info-label">📍 交易地点</text>
+          <text class="info-value">{{ product.trade_location }}</text>
         </view>
         <view class="info-row">
-          <text class="info-label">
-            🕐 发布时间
-          </text>
-          <text class="info-value">
-            {{ formatTime(product.created_at) }}
-          </text>
+          <text class="info-label">🕐 发布时间</text>
+          <text class="info-value">{{ formatTime(product.created_at) }}</text>
         </view>
       </view>
 
       <!-- 卖家信息 -->
-      <view v-if="product.seller" class="seller-section">
-        <text class="section-title">
-          卖家信息
-        </text>
-        <view class="seller-card" @click="goProfile">
-          <image
-            class="seller-avatar"
-            :src="product.seller.avatar || defaultAvatar"
-            mode="aspectFill"
-          />
-          <view class="seller-info">
-            <text class="seller-name">
-              {{ product.seller.nickname }}
-            </text>
-            <text v-if="product.seller.class_name" class="seller-detail">
-              {{ product.seller.class_name }}
-            </text>
-            <text v-if="product.seller.dorm_building" class="seller-detail">
-              {{ product.seller.dorm_building }}
-            </text>
-          </view>
-          <view class="seller-credit">
-            <text class="credit-score">
-              {{ product.seller.credit_score || 100 }}
-            </text>
-            <text class="credit-label">
-              信誉分
-            </text>
-          </view>
-          <text class="seller-arrow">
-            ›
-          </text>
-        </view>
-        <!-- 举报入口 — 仅非本人商品显示 -->
-        <view v-if="!isOwner" class="report-entry" @click="goReport">
-          <text>⚑ 举报商品</text>
-        </view>
-      </view>
+      <SellerInfo
+        v-if="product.seller"
+        :seller="product.seller"
+        :is-owner="isOwner"
+        :product-id="product.id"
+        :default-avatar="defaultAvatar"
+      />
     </template>
 
     <!-- 底部操作栏 -->
     <view v-if="product && !loading" class="bottom-actions">
       <button class="action-btn action-chat" @click="goChat">
-        <text class="action-chat-icon">
-          💬
-        </text>
+        <text class="action-chat-icon">💬</text>
         <text>聊一聊</text>
       </button>
       <!-- 非本人发布的在售商品：我想要 -->
@@ -176,13 +90,13 @@
       >
         {{ submitting ? '处理中...' : '我想要' }}
       </button>
-      <!-- 本人发布的商品显示编辑入口 -->
+      <!-- 本人发布的商品：active/off_shelf 状态可编辑 -->
       <button
-        v-if="isOwner"
-        class="action-btn action-manage"
-        @click="goManage"
+        v-if="isOwner && (product.status === 'active' || product.status === 'off_shelf')"
+        class="action-btn action-edit"
+        @click="goEdit"
       >
-        管理
+        编辑
       </button>
     </view>
   </view>
@@ -194,40 +108,33 @@ import { onLoad } from '@dcloudio/uni-app';
 import { detail as getDetail } from '@/api/product';
 import { createOrder } from '@/api/order';
 import { resolveImageUrl } from '@/api/index';
-import SafeImage from '@/components/SafeImage.vue';
 import { useUserStore } from '@/store/user';
-import { isIMReady, waitForReady, reInitIM, getLastError, cachePeerProfile } from '@/utils/im';
-import { ensureAccount } from '@/api/im';
+import { useAppStore } from '@/store/app';
+import { useChatHandler } from './composables/useChatHandler.js';
+import { formatPrice, formatTime } from '@/utils/format';
+import ProductSwiper from './components/ProductSwiper.vue';
+import SellerInfo from './components/SellerInfo.vue';
 
 const userStore = useUserStore();
+const appStore = useAppStore();
+const { goChat: doChatRaw } = useChatHandler();
 
 /** 加载状态 */
 const loading = ref(true);
 const errorMsg = ref('');
 const product = ref(null);
-
-/** 当前商品 ID */
 const currentId = ref(0);
 
-/**
- * 缺省头像 — 灰色圆形 SVG data URI
- * 当 seller.avatar 为 null/undefined 时显示，避免渲染破损图片图标
- */
+/** 缺省头像 — 灰色圆形 SVG data URI */
 const defaultAvatar =
   'data:image/svg+xml,' +
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="50" fill="#F0F0F0"/></svg>'
   );
 
-/** 是否为自己的商品 */
 const isOwner = ref(false);
-
-/** 下单提交中 */
 const submitting = ref(false);
 
-/**
- * 页面加载
- */
 onLoad((options) => {
   currentId.value = options.id ? parseInt(options.id, 10) : 0;
   if (!currentId.value) {
@@ -238,16 +145,12 @@ onLoad((options) => {
   loadDetail();
 });
 
-/**
- * 加载商品详情（从 currentId ref 读取商品 ID）
- */
 async function loadDetail() {
   loading.value = true;
   errorMsg.value = '';
   try {
     const data = await getDetail(currentId.value);
     product.value = data;
-    // 判断是否为自己的商品
     if (userStore.user && data.seller) {
       isOwner.value = userStore.user.id === data.seller.id;
     }
@@ -263,37 +166,6 @@ async function loadDetail() {
   }
 }
 
-/**
- * 格式化价格
- */
-function formatPrice(price) {
-  if (price == null) return '0';
-  return parseFloat(price).toFixed(2).replace(/\.00$/, '');
-}
-
-/**
- * 格式化时间
- */
-function formatTime(dateStr) {
-  if (!dateStr) return '';
-  try {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diff = now - d;
-    if (diff < 60 * 1000) return '刚刚';
-    if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))} 分钟前`;
-    if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))} 小时前`;
-    const month = d.getMonth() + 1;
-    const day = d.getDate();
-    return `${month} 月 ${day} 日`;
-  } catch {
-    return '';
-  }
-}
-
-/**
- * 状态标签文字
- */
 function statusLabel(status) {
   const map = {
     active: '在售',
@@ -305,143 +177,22 @@ function statusLabel(status) {
   return map[status] || status;
 }
 
-/**
- * 预览大图
- */
-function previewImages(index) {
-  if (product.value && product.value.images) {
-    const resolved = product.value.images.map(resolveImageUrl);
-    uni.previewImage({
-      current: resolved[index],
-      urls: resolved,
-    });
-  }
+function goChat() {
+  doChatRaw(product.value, userStore);
 }
 
-/**
- * 跳转卖家个人主页
- */
-function goProfile() {
-  if (product.value && product.value.seller) {
-    uni.navigateTo({ url: `/pages/user/profile?id=${product.value.seller.id}` });
-  }
+function goEdit() {
+  if (!product.value) return;
+  appStore.setPendingEditProductId(product.value.id);
+  uni.switchTab({ url: '/pages/product/publish' });
 }
 
-/**
- * 发起聊天（接入 IM SDK）
- *
- * 流程：
- *   1. 校验商品和卖家信息
- *   2. 防止和自己聊天
- *   3. 确保 IM SDK 已就绪
- *   4. 构造 conversationID（C2C{sellerId}） → 跳转聊天详情页
- */
-async function goChat() {
-  if (!product.value || !product.value.seller) {
-    uni.showToast({ title: '卖家信息不可用', icon: 'none', duration: 1500 });
-    return;
-  }
-
-  const myId = userStore.user?.id;
-  const sellerId = product.value.seller.id;
-
-  if (!myId) {
-    uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
-    return;
-  }
-
-  // 不能和自己聊天
-  if (myId === sellerId) {
-    uni.showToast({ title: '这是你自己发布的商品', icon: 'none', duration: 1500 });
-    return;
-  }
-
-  // 确保 IM SDK 已就绪
-  if (!isIMReady()) {
-    uni.showToast({ title: '消息服务连接中…', icon: 'none', duration: 2000 });
-    try {
-      // 主动尝试重新初始化（InitIM 在 onLaunch 中可能已失败）
-      await reInitIM();
-    } catch (err) {
-      const reason = getLastError() || err.message || '未知错误';
-      console.error('[goChat] IM 初始化失败:', reason);
-      uni.showModal({
-        title: '消息服务连接失败',
-        content: `无法连接到聊天服务。\n\n原因: ${reason}\n\n请检查网络后重试。如持续失败，请截图联系开发者。`,
-        showCancel: false,
-      });
-      return;
-    }
-  }
-
-  // 最终确认
-  if (!isIMReady()) {
-    uni.showToast({ title: '消息服务未就绪，请稍后再试', icon: 'none', duration: 2000 });
-    return;
-  }
-
-  // conversationID 格式：C2C + 对方 userId（腾讯云 IM C2C 规范）
-  const conversationID = `C2C${sellerId}`;
-  const sellerNickname = product.value.seller.nickname || '用户';
-  const sellerAvatar = product.value.seller.avatar || '';
-
-  // 缓存卖家资料到本地 — 消息列表页 mapConversation() 会优先从缓存读取昵称，
-  // 避免 IM SDK userProfile 为空时降级显示 "用户X"
-  cachePeerProfile(sellerId, sellerNickname, sellerAvatar);
-
-  // 确保卖家 IM 账号已导入，同时同步昵称和头像到 IM 资料系统，
-  // 防止 IM 服务端因缺少资料而生成 "用户X" 占位昵称
-  ensureAccount(sellerId, sellerNickname, sellerAvatar).catch(() => {
-    // 导入失败不阻塞跳转 —— 若账号已存在，发消息仍会成功
-  });
-
-  uni.navigateTo({
-    url: `/pages/chat/detail?conversationId=${conversationID}&nickname=${encodeURIComponent(sellerNickname)}&avatar=${encodeURIComponent(sellerAvatar)}`,
-  });
-}
-
-/**
- * 举报商品 — 跳转举报提交页
- */
-function goReport() {
-  if (!userStore.isLoggedIn) {
-    uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
-    return;
-  }
-  if (!product.value?.seller) return;
-  uni.navigateTo({
-    url: `/pages/report/submit?product_id=${product.value.id}&reported_user_id=${product.value.seller.id}`,
-  });
-}
-
-/**
- * 管理商品（本人发布）
- */
-function goManage() {
-  uni.showToast({ title: '商品管理功能即将上线', icon: 'none', duration: 1500 });
-}
-
-/**
- * 发起"我想要"——创建订单
- *
- * 校验链：
- *   1. 必须登录
- *   2. 不能购买自己的商品（前端拦截，后端也会校验）
- *   3. 商品状态检查（必须为 active）
- *   4. 二次确认弹窗（防止误触）
- *   5. 调用 createOrder API → 后端校验商品状态 + 信誉分 + 幂等
- *
- * 成功 → 跳转订单详情页
- * 失败 → 根据错误码展示提示
- */
 async function handleWant() {
-  // 1. 登录检查
   if (!userStore.isLoggedIn) {
     uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
     return;
   }
 
-  // 2. 信誉分预检（前端 UX 优化，后端仍会二次校验）
   if (!userStore.canTrade) {
     uni.showModal({
       title: '信誉分不足',
@@ -452,22 +203,18 @@ async function handleWant() {
     return;
   }
 
-  // 3. 不能买自己的
   if (isOwner.value) {
     uni.showToast({ title: '不能购买自己发布的商品', icon: 'none', duration: 1500 });
     return;
   }
 
-  // 4. 商品状态检查
   if (!product.value || product.value.status !== 'active') {
     uni.showToast({ title: '该商品当前不可交易', icon: 'none', duration: 1500 });
     return;
   }
 
-  // 5. 防重复提交
   if (submitting.value) return;
 
-  // 6. 二次确认（防止误触）
   const { confirm } = await uni.showModal({
     title: '确认下单',
     content: '请确认是否要下单？下单后商品将标记为"正在交易"状态，其他人将无法购买。',
@@ -480,14 +227,11 @@ async function handleWant() {
   try {
     const order = await createOrder({ product_id: product.value.id });
     uni.showToast({ title: '下单成功', icon: 'success', duration: 1500 });
-    // 跳转到订单详情
     uni.navigateTo({ url: `/pages/order/detail?id=${order.id}` });
   } catch (err) {
     const msg = err.message || '下单失败';
-    // 根据错误码给出友好提示
     if (msg.includes('3004') || msg.includes('商品已')) {
       uni.showToast({ title: '该商品已被其他人抢先下单', icon: 'none', duration: 2000 });
-      // 刷新商品状态
       loadDetail();
     } else if (msg.includes('3005') || msg.includes('自己')) {
       uni.showToast({ title: '不能购买自己发布的商品', icon: 'none', duration: 1500 });
@@ -506,7 +250,7 @@ async function handleWant() {
 }
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 @import '@/styles/tokens.scss';
 
 .detail-page {
@@ -515,7 +259,7 @@ async function handleWant() {
   padding-bottom: calc(128rpx + env(safe-area-inset-bottom));
 }
 
-// ── 加载/错误状态 ────────────────────────────────────────
+// ── 加载/错误状态 ──
 .detail-loading,
 .detail-error {
   display: flex;
@@ -554,37 +298,7 @@ async function handleWant() {
   }
 }
 
-// ── 图片轮播 ────────────────────────────────────────────
-.image-swiper {
-  position: relative;
-  background: #000000;
-}
-
-.swiper {
-  width: 100%;
-  height: 660rpx;
-}
-
-.swiper-image {
-  width: 100%;
-  height: 100%;
-}
-
-.image-count {
-  position: absolute;
-  bottom: 16rpx;
-  right: 16rpx;
-  padding: 4rpx 16rpx;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: $radius-full;
-}
-
-.image-count text {
-  font-size: $text-xs;
-  color: #FFFFFF;
-}
-
-// ── 价格区 ──────────────────────────────────────────────
+// ── 价格区 ──
 .price-section {
   background: $color-surface;
   padding: $space-card $space-page;
@@ -632,7 +346,7 @@ async function handleWant() {
   color: $color-muted;
 }
 
-// ── 标题区 ──────────────────────────────────────────────
+// ── 标题区 ──
 .title-section {
   background: $color-surface;
   padding: 0 $space-page $space-card;
@@ -645,7 +359,7 @@ async function handleWant() {
   line-height: 1.4;
 }
 
-// ── 标签区 ──────────────────────────────────────────────
+// ── 标签区 ──
 .tags-section {
   background: $color-surface;
   padding: 0 $space-page $space-card;
@@ -674,10 +388,9 @@ async function handleWant() {
   color: $color-success;
 }
 
-// ── 分区 ────────────────────────────────────────────────
+// ── 分区 ──
 .desc-section,
-.info-section,
-.seller-section {
+.info-section {
   background: $color-surface;
   margin-top: 16rpx;
   padding: $space-card $space-page;
@@ -691,7 +404,7 @@ async function handleWant() {
   margin-bottom: 16rpx;
 }
 
-// ── 描述 ────────────────────────────────────────────────
+// ── 描述 ──
 .desc-text {
   font-size: $text-sm;
   color: $color-body;
@@ -699,7 +412,7 @@ async function handleWant() {
   white-space: pre-wrap;
 }
 
-// ── 交易信息 ────────────────────────────────────────────
+// ── 交易信息 ──
 .info-row {
   display: flex;
   justify-content: space-between;
@@ -716,78 +429,7 @@ async function handleWant() {
   color: $color-body;
 }
 
-// ── 卖家信息 ────────────────────────────────────────────
-.seller-card {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-}
-
-.seller-avatar {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
-  background: $color-divider;
-  flex-shrink: 0;
-}
-
-.seller-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.seller-name {
-  font-size: $text-base;
-  font-weight: $weight-medium;
-  color: $color-title;
-}
-
-.seller-detail {
-  font-size: $text-xs;
-  color: $color-muted;
-  margin-top: 4rpx;
-}
-
-.seller-credit {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.credit-score {
-  font-size: $text-xl;
-  font-weight: $weight-bold;
-  color: $color-success;
-  font-family: $font-mono;
-}
-
-.credit-label {
-  font-size: 20rpx;
-  color: $color-muted;
-}
-
-.seller-arrow {
-  font-size: 36rpx;
-  color: $color-muted;
-  flex-shrink: 0;
-}
-
-// ── 举报入口 ──────────────────────────────────────────────
-.report-entry {
-  text-align: right;
-  padding-top: 12rpx;
-  margin-top: 8rpx;
-  border-top: 1rpx solid $color-divider;
-}
-
-.report-entry text {
-  font-size: $text-xs;
-  color: $color-muted;
-}
-
-// ── 底部操作栏 ──────────────────────────────────────────
+// ── 底部操作栏 ──
 .bottom-actions {
   position: fixed;
   bottom: 0;
@@ -832,7 +474,7 @@ async function handleWant() {
   box-shadow: $shadow-button;
 }
 
-.action-manage {
+.action-edit {
   flex: 1;
   background: $color-bg;
   color: $color-body;
