@@ -192,6 +192,70 @@ const productRepo = {
   },
 
   /**
+   * 管理端商品列表（不过滤 status，管理员可见全部状态）。
+   * @param {Object} filters
+   * @param {string} [filters.status]   - 状态筛选（可选，不传=全部）
+   * @param {string} [filters.keyword]  - 搜索关键词（标题/卖家昵称）
+   * @param {string} [filters.sort]     - 排序
+   * @param {number} [filters.page]     - 页码
+   * @param {number} [filters.pageSize] - 每页条数
+   * @returns {Promise<{list: Array, total: number, page: number, pageSize: number}>}
+   */
+  async listAll(filters) {
+    const { keyword, status, sort = 'latest' } = filters;
+    const page = Math.max(1, parseInt(filters.page, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(filters.pageSize, 10) || 20));
+
+    const conditions = [];
+    const params = [];
+
+    // 可选状态筛选
+    if (status) {
+      conditions.push('p.status = ?');
+      params.push(status);
+    }
+
+    // 关键词搜索
+    if (keyword) {
+      conditions.push(
+        '(MATCH(p.title, p.description) AGAINST(? IN BOOLEAN MODE) OR p.title LIKE ? OR u.nickname LIKE ?)'
+      );
+      params.push(keyword, `%${keyword}%`, `%${keyword}%`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    let orderBy;
+    switch (sort) {
+      case 'priceAsc':  orderBy = 'ORDER BY p.price ASC'; break;
+      case 'priceDesc': orderBy = 'ORDER BY p.price DESC'; break;
+      default:          orderBy = 'ORDER BY p.created_at DESC'; break;
+    }
+
+    const [countResult] = await query(
+      `SELECT COUNT(*) AS total FROM products p JOIN users u ON p.seller_id = u.id ${where}`,
+      params
+    );
+
+    const offset = (page - 1) * pageSize;
+    const rows = await query(
+      `SELECT ${LIST_FIELDS}
+       FROM products p
+       JOIN users u ON p.seller_id = u.id
+       ${where} ${orderBy}
+       LIMIT ? OFFSET ?`,
+      [...params, pageSize, offset]
+    );
+
+    return {
+      list: rows,
+      total: countResult.total,
+      page,
+      pageSize,
+    };
+  },
+
+  /**
    * 我发布的商品列表
    * @param {number} sellerId
    * @param {Object} filters - { status?, page, pageSize }

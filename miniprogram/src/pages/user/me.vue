@@ -5,7 +5,7 @@
       <view class="user-card">
         <image
           class="user-avatar"
-          :src="user?.avatar || defaultAvatar"
+          :src="avatarUrl || defaultAvatar"
           mode="aspectFill"
         />
         <view class="user-info">
@@ -41,15 +41,33 @@
         <text class="menu-label">信誉分明细</text>
         <text class="menu-arrow">›</text>
       </view>
+      <view class="menu-item" @click="goEditProfile">
+        <text class="menu-icon">✏️</text>
+        <text class="menu-label">编辑资料</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" @click="goSettings">
+        <text class="menu-icon">⚙️</text>
+        <text class="menu-label">系统设置</text>
+        <text class="menu-arrow">›</text>
+      </view>
       <view class="menu-item" @click="goReports">
         <text class="menu-icon">📝</text>
         <text class="menu-label">我的举报</text>
         <text class="menu-arrow">›</text>
       </view>
+      <view class="menu-item" @click="goNotifications">
+        <text class="menu-icon">🔔</text>
+        <text class="menu-label">通知中心</text>
+        <view v-if="unreadNum > 0" class="menu-badge">
+          <text class="menu-badge-text">{{ unreadNum > 99 ? '99+' : unreadNum }}</text>
+        </view>
+        <text class="menu-arrow">›</text>
+      </view>
     </view>
 
-    <!-- 管理功能（仅管理员/cs 可见） -->
-    <view v-if="userStore.isAdmin" class="menu-section">
+    <!-- 管理功能（cs + admin 可见工单管理，admin 可见全部） -->
+    <view v-if="userStore.isAdmin || userStore.isCS" class="menu-section">
       <view class="menu-section-header">
         <text class="menu-section-title">管理功能</text>
       </view>
@@ -58,11 +76,33 @@
         <text class="menu-label">工单管理</text>
         <text class="menu-arrow">›</text>
       </view>
-      <view class="menu-item" @click="goDashboard">
-        <text class="menu-icon">📊</text>
-        <text class="menu-label">数据看板</text>
-        <text class="menu-arrow">›</text>
-      </view>
+      <template v-if="userStore.isAdmin">
+        <view class="menu-item" @click="goDashboard">
+          <text class="menu-icon">📊</text>
+          <text class="menu-label">数据看板</text>
+          <text class="menu-arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goUsers">
+          <text class="menu-icon">👥</text>
+          <text class="menu-label">用户管理</text>
+          <text class="menu-arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goProducts">
+          <text class="menu-icon">🛒</text>
+          <text class="menu-label">商品管理</text>
+          <text class="menu-arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goLogs">
+          <text class="menu-icon">📝</text>
+          <text class="menu-label">审计日志</text>
+          <text class="menu-arrow">›</text>
+        </view>
+        <view class="menu-item" @click="goSensitive">
+          <text class="menu-icon">🛡️</text>
+          <text class="menu-label">敏感词库</text>
+          <text class="menu-arrow">›</text>
+        </view>
+      </template>
     </view>
 
     <!-- 退出登录 -->
@@ -75,17 +115,58 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
 import { useUserStore } from '@/store/user';
+import { resolveImageUrl } from '@/api/index';
+import { unreadCount } from '@/api/notification';
 
 const userStore = useUserStore();
 const user = computed(() => userStore.user);
+
+/**
+ * 用户头像 URL（经 host 解析——适配模拟器/真机/IP 变更）
+ *
+ * 问题背景：开发环境上传的图片 URL 写死为当前 BASE_URL 的 host，
+ * 若设备（真机 vs 模拟器）对 host 的可达性不同，图片可能加载失败。
+ * resolveImageUrl 统一替换 localhost→当前 BASE_URL host。
+ */
+const avatarUrl = computed(() => resolveImageUrl(user.value?.avatar));
 
 const defaultAvatar =
   'data:image/svg+xml,' +
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="50" fill="#F0F0F0"/></svg>'
   );
+
+// ── 未读通知数 ──────────────────────────────────────────
+const unreadNum = ref(0);
+
+async function loadUnreadCount() {
+  try {
+    const data = await unreadCount();
+    unreadNum.value = data.count || 0;
+  } catch (err) {
+    // 未读 badge 非关键功能，静默降级但需记录日志
+    console.warn('[me] 未读通知数加载失败', err.message);
+  }
+}
+
+/**
+ * 每次回到"我的"页面时刷新用户信息 + 未读通知数
+ *
+ * 为什么要刷新用户信息：edit.vue 保存资料后虽然更新了 Pinia store，
+ * 但 WeChat 小程序 Tab 页面可能在 sub-page 期间被缓存，模板不一定
+ * 自动重新渲染。onShow 中显式调用 getMeAction() 确保数据新鲜。
+ */
+onShow(() => {
+  loadUnreadCount();
+  if (userStore.isLoggedIn) {
+    userStore.getMeAction().catch((err) => {
+      console.warn('[me] 用户信息刷新失败', err.message);
+    });
+  }
+});
 
 function goOrders() {
   uni.navigateTo({ url: '/pages/order/list' });
@@ -103,8 +184,20 @@ function goCredit() {
   uni.navigateTo({ url: '/pages/user/credit' });
 }
 
+function goEditProfile() {
+  uni.navigateTo({ url: '/pages/user/edit' });
+}
+
+function goSettings() {
+  uni.navigateTo({ url: '/pages/user/settings' });
+}
+
 function goReports() {
   uni.navigateTo({ url: '/pages/report/list' });
+}
+
+function goNotifications() {
+  uni.navigateTo({ url: '/pages/notification/index' });
 }
 
 function goTickets() {
@@ -113,6 +206,22 @@ function goTickets() {
 
 function goDashboard() {
   uni.navigateTo({ url: '/pages/admin/dashboard' });
+}
+
+function goUsers() {
+  uni.navigateTo({ url: '/pages/admin/users' });
+}
+
+function goProducts() {
+  uni.navigateTo({ url: '/pages/admin/products' });
+}
+
+function goLogs() {
+  uni.navigateTo({ url: '/pages/admin/logs' });
+}
+
+function goSensitive() {
+  uni.navigateTo({ url: '/pages/admin/sensitive' });
 }
 
 function onLogout() {
@@ -240,6 +349,24 @@ function onLogout() {
 .menu-arrow {
   font-size: 36rpx;
   color: $color-muted;
+}
+
+.menu-badge {
+  min-width: 36rpx;
+  height: 36rpx;
+  border-radius: 18rpx;
+  background: $color-error;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12rpx;
+  padding: 0 8rpx;
+}
+
+.menu-badge-text {
+  font-size: 20rpx;
+  color: #FFFFFF;
+  font-weight: $weight-bold;
 }
 
 // ── 退出登录 ──────────────────────────────────────────────

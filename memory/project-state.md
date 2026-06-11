@@ -1,17 +1,18 @@
 ---
 name: project-state
-description: 项目当前状态 — 第 7 轮完成，举报/管理后台/互评全栈实现，测试 9 文件 126 用例通过
+description: 项目当前状态 — 第 10 轮完成，第 11 轮计划已编写（缓存 + 游标分页 + 性能），131 后端测试通过
 metadata:
   type: project
-  updatedAt: 2026-06-10T10:00
-  currentIteration: 7
+  updatedAt: 2026-06-11T14:00
+  currentIteration: 11
+  testedIteration: 10
   commit: f8bff9a
 ---
 
 # 项目当前状态
 
-**评估日期：** 2026-06-08
-**阶段：** 第 5 轮（聊天 IM + 通知中心）全部完成 ✅
+**评估日期：** 2026-06-11
+**阶段：** 第 9 轮（收尾补全 + P1 修复 + 通知/信誉分收尾）完成 ✅
 
 ## 迭代进度总览
 
@@ -26,7 +27,12 @@ metadata:
 | 5 | 聊天 (IM) | ✅ | 13 (4 后端 + 9 前端) | 9/9 (A5-001~009) | 2026-06-08 |
 | 5A | 第 5 轮审计修复 | ✅ | 4 (3 前端 + 1 文档) | 8/8 (P1×2 + P2×6) | 2026-06-08 |
 | 6 | 交易流程 | ✅ | 15 (2 后端测试 + 1 后端修改 + 8 前端新建/改写 + 3 API 重写 + 1 组件修复) | 6/6 (BUG-025~030) | 2026-06-10 |
-| 7 | 举报/管理/互评 | ✅ | 11 (4 后端 + 7 前端) | 0/0 (P1×4 + P2×5 待处理) | 2026-06-10 |
+| 7 | 举报/管理/互评 | ✅ | 11 (4 后端 + 7 前端) | 0/0 (P1×4 + P2×5 审阅发现，非阻塞) | 2026-06-10 |
+| 7T | 第 7+8 轮真机测试 | ✅ | — | — | 2026-06-11 |
+| 8 | 管理后台 | ✅ | 9 (6 新建 + 3 修改，纯前端) | — | 2026-06-11 |
+| 9 | 收尾补全 + P1 修复 | ✅ | 12 (7 页面 + 1 API + 4 修改) | 7/7 P1 修复 | 2026-06-11 |
+| 10 | 工程化基础审计 | ✅ | 11 (2 console.log 替换 + 1 bare Error 替换 + 6 business 日志补全 + 1 脱敏 + 1 文档) | 26 business 日志点 | 2026-06-11 |
+| 11 | 缓存 + 性能 | 🔲 待开始 | ~9 (LRU 接入 + 游标分页 + 前端 + 测试) | — | — |
 
 ## 第 7 轮：举报/管理后台/互评增强 ✅
 
@@ -242,6 +248,136 @@ metadata:
 
 ---
 
+## 第 8 轮：管理后台（用户/商品/审计/敏感词）✅（2026-06-11）
+
+**文件：** 前端 6 新建 + 3 修改，后端 0 改动
+
+**关键产出：**
+
+| 层 | 文件 | 操作 | 行数 | 关键功能 |
+|:--:|------|:--:|:--:|------|
+| 前端组件 | `components/EmptyState.vue` | 重写 | 90 | 通用空状态：icon/title/description/actionText/actionPath/插槽 |
+| 前端组件 | `components/AppNavbar.vue` | 重写 | 130 | 自定义导航栏：状态栏自适应/返回/右侧操作/背景渐变 |
+| 前端页面 | `pages/admin/users.vue` | 新建 | 350 | 用户管理：搜索手机号/昵称、状态/角色筛选、封禁/解封（二次确认）、手机号脱敏、信誉分颜色、权限守卫 |
+| 前端页面 | `pages/admin/products.vue` | 新建 | 300 | 商品管理：搜索标题/卖家、状态Tab筛选、强制下架（二次确认）、缩略图+标签 |
+| 前端页面 | `pages/admin/logs.vue` | 新建 | 220 | 审计日志：操作类型筛选/日期范围/log卡片（管理员/对象/原因/时间）、分页 |
+| 前端页面 | `pages/admin/sensitive.vue` | 新建 | 250 | 敏感词库：词数大数字展示、文本检查（textarea+结果）、重载词库（二次确认） |
+| 前端页面 | `pages/user/me.vue` | 修改 | +40 | 管理入口 2→6 个，区分 admin（6入口） vs cs（1入口：工单） |
+| 前端 Store | `store/user.js` | 修改 | +3 | isAdmin→admin only / 新增 isCS→cs+admin |
+| 前端路由 | `pages.json` | 修改 | +20 | 注册 4 个新 admin 路由 |
+
+**架构决策：**
+- 后端零改动：14 个管理 API + 权限中间件全部就绪
+- 权限安全边界在后端：前端仅 UI 隐藏，后端 middleware 强制校验
+- 分页模式：固化 A6-001 targetPage 模式（成功后才持久化页码）
+- 所有破坏性操作均加 `uni.showModal` 二次确认，确认按钮红色警示
+
+**已知限制：**
+- 商品列表 API 仅返回 active 状态，off_shelf/sold Tab 暂为空（waiting for backend `GET /api/admin/products` endpoint）
+- 敏感词库仅统计/重载/检查，无可视化词列表或在线增删改
+
+**验证结果：** ESLint 0 新错误（196 格式警告均为单行元素换行风格，与已有代码一致）、build 成功
+**详细计划：** [[../plans/iteration8-admin-management.md]]
+
+---
+
+## 第 9 轮：收尾补全 + P1 修复 + 通知/信誉分收尾 ✅（2026-06-11）
+
+**文件：** 前端 7 页面新建 + 1 API 修改 + 4 页面修改 + 后端 0 新代码
+
+**关键产出：**
+
+| 层 | 文件 | 操作 | 行数 | 关键功能 |
+|:--:|------|:--:|:--:|------|
+| 前端 API | `api/user.js` | 修改 | +8 | updateProfile() — PUT /api/users/me |
+| 前端页面 | `pages/user/edit.vue` | 重写 | 170 | 编辑资料：头像上传（COS）/昵称/班级/宿舍、保存后刷新 store |
+| 前端页面 | `pages/user/profile.vue` | 重写 | 280 | 个人主页：大头像+昵称+信誉分、评价汇总（平均分）、历史评价列表（StarRating） |
+| 前端页面 | `pages/user/settings.vue` | 重写 | 130 | 设置页：关于我们/用户协议/隐私政策/退出登录 |
+| 前端页面 | `pages/about/index.vue` | 重写 | 110 | 关于我们：渐变头部+Logo+技术栈标签+联系方式 |
+| 前端页面 | `pages/error/not-found.vue` | 重写 | 80 | 404 页：大图标+描述+返回首页（switchTab） |
+| 前端页面 | `pages/error/network.vue` | 重写 | 90 | 网络异常：检测网络状态+重试+自动返回 |
+| 前端页面 | `pages/review/create.vue` | 重写 | 65 | 废弃页面：引导跳转订单列表 |
+| 前端页面 | `pages/user/me.vue` | 修改 | +40 | 通知中心入口+未读 badge（红色数字角标，最大 99+） |
+| 前端页面 | `pages/product/detail.vue` | 修改 | +25 | "我想要"信誉分预检（<30 弹窗+按钮置灰） |
+| 前端页面 | `pages/product/publish.vue` | 修改 | +12 | 发布按钮信誉分预检（<60 弹窗） |
+| 前端页面 | `pages/admin/dashboard.vue` | 修改 | -4+6 | P1-02：移除模块级同步权限判断 |
+| 前端页面 | `pages/admin/tickets.vue` | 修改 | -4+3 | P1-02：移除模块级同步权限判断 |
+
+**P1 修复清单（7 项）：**
+
+| ID | 来源 | 问题 | 状态 |
+|:--:|:--:|------|:--:|
+| P1-01 | R7 | tickets.vue closeResolveModal 不检查 submitting | ✅ 已修复（前期） |
+| P1-02 | R7 | dashboard+tickets 权限守卫模块级同步判断 | ✅ 本轮修复 |
+| P1-03 | R7 | order/detail.vue temp_ ID 前缀 | ✅ 已修复（前期） |
+| P1-04 | R7 | report detail 端点测试缺失 | ✅ 已存在（5 用例） |
+| P1-001 | R8 | AppNavbar @back 从未 emit | ✅ 已修复（前期） |
+| P1-002 | R8 | products.vue activeStatus 未传参 | ✅ 已修复（前期） |
+| P1-003 | R8 | products.vue 使用公开 API 而非 admin API | ✅ 已修复（前期） |
+
+**验证结果：** `npx vitest run` 10 文件 131 用例全绿，前端 ESLint 0 新错误，build DONE
+**详细计划：** [[../plans/iteration9-cleanup-polish.md]]
+
+---
+
+## 第 9 轮后热修复（2026-06-11）
+
+在第 9 轮收尾验证过程中发现 3 个 Bug，均已修复并验证通过：
+
+| Bug | 级别 | 简述 | 位置 |
+|-----|:--:|------|------|
+| BUG-031 | P1 | 审计日志时间筛选 end_date 不含时间分量 → 当天记录被排除 | logs.vue + report.js |
+| BUG-032 | P1 | 头像保存后"我的"Tab 页不刷新 → onShow 加 getMeAction() + resolveImageUrl | me.vue |
+| BUG-033 | P2 | 微信渲染层报错：addListener undefined + first rendering data 冲突 | App.vue |
+
+**修复文件：** 前端 3 文件（App.vue / me.vue / logs.vue）+ 后端 1 文件（report.js）
+**验证：** ESLint 0 errors；build DONE；所有功能正常使用。
+
+**详细记录：** [[known-bugs]] BUG-031~033
+
+---
+
+## 当前代码状态
+
+| 层 | 完成度 | 说明 |
+|------|:--:|------|
+| 后端 server/src/ | **~98%** | 57 文件 5 层完整，scheduler 4 cron 全实现，第 10 轮工程化审计通过 |
+| 前端 miniprogram/src/ | **~82%** | 24/25 页面完成（仅 search 为 stub），6 组件 + 7 API 模块 |
+| 数据库 | **100%** | 14 表 + 5 迁移 + 种子数据 |
+| 测试 | **~40%** | 10 文件 131 用例全部通过 |
+| 文档 | **100%** | 16 份文档全部完成，7 轮审阅 95 问题清零 |
+
+## 第 10 轮：工程化基础审计 ✅（2026-06-11）
+
+**性质：** 审计+补漏轮，非新功能开发。基础设施（winston/AppError/.env）在第 1 轮已全部就绪。
+
+**产出：**
+
+| 类别 | 数量 | 详情 |
+|------|:--:|------|
+| console.log 替换 | 2 处 | db.js 连接日志 + sensitive-filter.js 词库加载 → `logger.business.info()` |
+| bare Error 替换 | 1 处 | services/im/provider.js → `internal()` AppError |
+| business 日志补全 | 14 个方法 | auth(3) + product(3) + order(4) + report(1) + review(1) + admin(6 已有) |
+| 手机号脱敏 | 1 处 | auth.js 新用户注册日志 → `138****1234` 格式 |
+| 敏感信息扫描 | 全量 | 无密码/Token 泄露；`admin_phone` 仅 admin API 可访问（设计意图） |
+
+**审计统计：**
+- console.log 残余：20 处保留（app.js 启动 banner 4 + migrate.js CLI 16），0 处应替换而未替换
+- 裸 Error：2 处保留（config/index.js fail-fast + migrate.js CLI），0 处在请求链路
+- 错误码覆盖率：30/30 文档错误码 100% 实现，多出 2004 保留
+- production detail 泄露：error-handler.js 已正确实现 `detail: isDev ? err.detail : null`
+- business 日志：从零覆盖提升至 **26 个日志点**，覆盖全部关键业务操作
+
+**验证结果：** `npx vitest run` 10 文件 131 用例全绿，所有日志点格式统一。
+
+**详细计划：** [[../plans/iteration10-engineering-audit]]
+
+---
+
 ## 下一步
 
-**第 8 轮候选：** 编辑商品、设置/关于页面、前端测试补全、P1 修复项
+**第 11 轮候选（编码迭代计划）：**
+- LRU 缓存接入（productService.list/detail + userService.getById）
+- 游标分页（商品列表"加载更多"）
+- 慢查询日志验证
+- 图片懒加载

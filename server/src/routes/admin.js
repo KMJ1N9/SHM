@@ -12,7 +12,8 @@
  *   PUT  /api/admin/users/:id/unban      — 解封用户
  *
  * 商品管理（需管理员权限）：
- *   PUT  /api/admin/products/:id/off-shelf — 下架商品
+ *   GET  /api/admin/products                — 商品列表（含全部状态）
+ *   PUT  /api/admin/products/:id/off-shelf  — 下架商品
  *
  * 数据统计（需管理员权限）：
  *   GET  /api/admin/analytics/overview       — 平台数据概览
@@ -58,6 +59,7 @@ adminRouter.put('/users/:id/ban', adminController.banUser);
 adminRouter.put('/users/:id/unban', adminController.unbanUser);
 
 // ---- 商品管理（仅管理员） ----
+adminRouter.get('/products', adminController.listProducts);
 adminRouter.put('/products/:id/off-shelf', adminController.offShelfProduct);
 
 // ---- 数据统计（仅管理员） ----

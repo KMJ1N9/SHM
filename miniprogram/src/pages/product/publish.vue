@@ -301,7 +301,10 @@
 import { ref, reactive } from 'vue';
 import { create as createProduct } from '@/api/product';
 import { chooseAndUpload } from '@/utils/cos';
+import { useUserStore } from '@/store/user';
 import ImageUploader from '@/components/ImageUploader.vue';
+
+const userStore = useUserStore();
 
 /** 步骤定义 */
 const steps = ['上传图片', '填写信息', '确认发布'];
@@ -446,6 +449,17 @@ function validateForm() {
  * 提交发布
  */
 async function submitPublish() {
+  // 信誉分预检（前端 UX 优化，后端仍会二次校验）
+  if (!userStore.canPublish) {
+    uni.showModal({
+      title: '信誉分不足',
+      content: '你的信誉分低于 60，无法发布商品。请通过完成交易来恢复信誉分。',
+      showCancel: false,
+      confirmText: '我知道了',
+    });
+    return;
+  }
+
   submitting.value = true;
   try {
     await createProduct({

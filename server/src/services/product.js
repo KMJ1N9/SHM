@@ -8,6 +8,7 @@ const config = require('../config');
 const db = require('../models/db');
 const productRepo = require('../repository/product');
 const sensitiveFilter = require('../utils/sensitive-filter');
+const logger = require('../utils/logger').business;
 const {
   notFound, invalidStatus, creditTooLowPublish, badRequest,
 } = require('../utils/errors');
@@ -154,6 +155,8 @@ const productService = {
       images,
     });
 
+    logger.info('商品发布', { productId: product.id, userId: sellerId });
+
     return nestSeller(product);
   },
 
@@ -206,6 +209,9 @@ const productService = {
     }
 
     const updated = await productRepo.update(productId, updates);
+
+    logger.info('商品编辑', { productId, userId });
+
     return nestSeller(updated);
   },
 
@@ -233,6 +239,8 @@ const productService = {
       }
 
       await productRepo.updateStatus(productId, 'deleted', conn);
+
+      logger.info('商品删除', { productId, userId });
     });
   },
 

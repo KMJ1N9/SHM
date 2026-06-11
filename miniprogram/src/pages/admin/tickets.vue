@@ -193,14 +193,12 @@ import { useUserStore } from '@/store/user';
 
 // ============================================================
 // 权限校验（computed 确保 Pinia 恢复后响应式更新）
+// 注意：不做模块级同步判断——Pinia 在 <script setup> 执行时尚未从本地存储恢复，
+// 同步判断 userRole.value 永远是默认值 'user'，会导致 cs/admin 用户被误踢。
+// 权限守卫完全由模板 v-if + onShow 协同完成。
 // ============================================================
 const userStore = useUserStore();
 const userRole = computed(() => userStore.user?.role || 'user');
-
-if (userRole.value !== 'cs' && userRole.value !== 'admin') {
-  uni.showToast({ title: '仅客服和管理员可访问', icon: 'none', duration: 2000 });
-  setTimeout(() => uni.navigateBack(), 2000);
-}
 
 // ============================================================
 // 筛选配置
@@ -372,6 +370,7 @@ async function handleResolve() {
       deduct_credit: deductCredit,
     });
     uni.showToast({ title: '裁决完成', icon: 'success' });
+    resolveModal.submitting = false;
     closeResolveModal();
     loading.value = true;
     await fetchTickets(true);

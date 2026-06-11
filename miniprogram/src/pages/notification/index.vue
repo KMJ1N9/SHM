@@ -339,9 +339,12 @@ function parseMetadata(meta) {
 // 生命周期
 // ============================================================
 
+// 首次加载
+loadNotifications();
+
 // 每次显示页面时刷新（从其他页面返回时更新已读状态）
 onShow(() => {
-  if (!loading.value) {
+  if (!loading.value && !refreshing.value) {
     loadNotifications();
   }
 });

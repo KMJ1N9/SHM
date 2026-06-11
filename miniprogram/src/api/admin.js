@@ -89,6 +89,19 @@ export function unbanUser(id) {
 // ============================================================
 
 /**
+ * 管理端商品列表（含全部状态，不硬编码 active）。
+ * @param {Object} [params]
+ * @param {string} [params.status]   - 状态筛选：active|reserved|sold|off_shelf|deleted（可选，不传=全部）
+ * @param {string} [params.keyword]  - 搜索关键词
+ * @param {number} [params.page]
+ * @param {number} [params.pageSize]
+ * @returns {Promise<{list: Array, total: number, page: number, pageSize: number}>}
+ */
+export function getAdminProducts(params) {
+  return get('/admin/products', params);
+}
+
+/**
  * 下架商品
  * @param {number} id - 商品 ID
  * @returns {Promise<Object>}

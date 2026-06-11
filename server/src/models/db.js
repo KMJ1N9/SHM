@@ -14,7 +14,7 @@
 
 const mysql = require('mysql2/promise');
 const config = require('../config');
-const { error: errorLogger } = require('../utils/logger');
+const { error: errorLogger, business: businessLogger } = require('../utils/logger');
 
 const pool = mysql.createPool(config.db);
 
@@ -23,7 +23,11 @@ pool
   .getConnection()
   .then((conn) => {
     conn.release();
-    console.log(`[DB] MySQL 连接成功: ${config.db.host}:${config.db.port}/${config.db.database}`);
+    businessLogger.info('[DB] MySQL 连接成功', {
+      host: config.db.host,
+      port: config.db.port,
+      database: config.db.database,
+    });
   })
   .catch((err) => {
     console.error('[DB] MySQL 连接失败:', err.message);

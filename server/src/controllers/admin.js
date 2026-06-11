@@ -106,6 +106,18 @@ const adminController = {
   // ============================================================
 
   /**
+   * GET /api/admin/products — 管理端商品列表
+   */
+  async listProducts(req, res, next) {
+    try {
+      const result = await adminService.listAllProducts(req.query);
+      res.json({ code: 0, message: 'ok', data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  /**
    * PUT /api/admin/products/:id/off-shelf — 下架商品
    */
   async offShelfProduct(req, res, next) {

@@ -14,6 +14,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { business: businessLogger } = require('./logger');
 
 // 默认词库路径
 const DICT_PATH = path.resolve(__dirname, '../../data/sensitive-words.txt');
@@ -63,7 +64,7 @@ class SensitiveFilter {
 
       this.wordCount = words.length;
       this._loaded = true;
-      console.log(`[SENSITIVE] 词库加载完成: ${words.length} 个敏感词`);
+      businessLogger.info('[SENSITIVE] 词库加载完成', { count: words.length });
     } catch (err) {
       console.error(`[SENSITIVE] 词库加载失败: ${err.message}`);
       this._loaded = true;

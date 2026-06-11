@@ -1,5 +1,5 @@
 <script setup>
-import { watch } from 'vue';
+import { watch, nextTick } from 'vue';
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
 import { useUserStore } from '@/store/user';
 import { useAppStore } from '@/store/app';
@@ -58,9 +58,16 @@ onLaunch(async () => {
   startNotifyPolling();
 
   // 监听网络状态
-  uni.onNetworkStatusChange((res) => {
-    appStore.setNetworkStatus(res.isConnected ? 'online' : 'offline');
-  });
+  // 注意：微信小程序渲染层在首次渲染时可能尚未初始化 listener 管道，
+  // 导致 "Cannot read property 'addListener' of undefined" 错误。
+  // 用 try/catch 包裹并降级为静默跳过——网络状态监听非核心功能。
+  try {
+    uni.onNetworkStatusChange((res) => {
+      appStore.setNetworkStatus(res.isConnected ? 'online' : 'offline');
+    });
+  } catch (err) {
+    console.warn('[App] 网络状态监听注册失败（非关键功能，忽略）:', err.message || err);
+  }
 });
 
 onShow(() => {
@@ -86,6 +93,11 @@ onHide(() => {
 
 /**
  * 监听未读总数 → 更新 TabBar 消息页签角标
+ *
+ * 注意：不使用 { immediate: true }，因为它在首次渲染时立即调用
+ * setTabBarBadge 可能与微信渲染层初始化时序冲突，导致
+ * "Expected updated data but get first rendering data" 错误。
+ * 改用 nextTick 在首个渲染周期结束后设置初始角标。
  */
 watch(
   () => appStore.totalUnread,
@@ -98,9 +110,21 @@ watch(
     } else {
       uni.removeTabBarBadge({ index: TAB_MSG_INDEX });
     }
-  },
-  { immediate: true }
+  }
 );
+
+// 首个渲染周期结束后再设置 TabBar 角标（避免与渲染层初始化时序冲突）
+nextTick(() => {
+  const count = appStore.totalUnread;
+  if (count > 0) {
+    uni.setTabBarBadge({
+      index: TAB_MSG_INDEX,
+      text: count > 99 ? '99+' : String(count),
+    });
+  } else {
+    uni.removeTabBarBadge({ index: TAB_MSG_INDEX });
+  }
+});
 
 // ============================================================
 // 通知轮询

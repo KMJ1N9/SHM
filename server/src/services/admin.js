@@ -165,6 +165,15 @@ const adminService = {
   // ============================================================
 
   /**
+   * 管理端商品列表（含全部状态：active/reserved/sold/off_shelf/deleted）。
+   * @param {Object} filters
+   * @returns {Promise<{list: Array, total: number, page: number, pageSize: number}>}
+   */
+  async listAllProducts(filters) {
+    return productRepo.listAll(filters);
+  },
+
+  /**
    * 下架商品
    * @param {number} productId
    * @param {number} adminId

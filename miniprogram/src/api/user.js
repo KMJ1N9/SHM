@@ -5,7 +5,7 @@
  *   - getPublicProfile(userId) — 获取用户公开信息（昵称、头像等）
  */
 
-import { get } from './index';
+import { get, put } from './index';
 
 /**
  * 获取用户公开信息
@@ -18,4 +18,18 @@ import { get } from './index';
  */
 export function getPublicProfile(userId) {
   return get(`/users/${userId}`);
+}
+
+/**
+ * 更新当前用户个人资料
+ *
+ * @param {Object} data
+ * @param {string} [data.nickname]      - 新昵称
+ * @param {string} [data.avatar]        - 新头像 URL
+ * @param {string} [data.class_name]    - 班级
+ * @param {string} [data.dorm_building] - 宿舍楼栋
+ * @returns {Promise<Object>} 更新后的用户信息
+ */
+export function updateProfile(data) {
+  return put('/users/me', data);
 }

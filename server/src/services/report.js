@@ -7,6 +7,7 @@
 const reportRepo = require('../repository/report');
 const orderRepo = require('../repository/order');
 const productRepo = require('../repository/product');
+const logger = require('../utils/logger').business;
 const {
   notFound, duplicateReport, orderStateInvalid,
 } = require('../utils/errors');
@@ -49,7 +50,7 @@ const reportService = {
       }
     }
 
-    return reportRepo.create({
+    const report = await reportRepo.create({
       reporter_id: reporterId,
       reported_user_id: data.reported_user_id,
       product_id: data.product_id || null,
@@ -58,6 +59,10 @@ const reportService = {
       description: data.description,
       evidence_images: data.evidence_images || [],
     });
+
+    logger.info('举报创建', { reportId: report.id, userId: reporterId });
+
+    return report;
   },
 
   /**

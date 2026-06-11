@@ -74,7 +74,7 @@ const authService = {
     if (!user) {
       user = await userRepo.create({ phone, nickname: '微信用户' });
       isNewUser = true;
-      logger.info('新用户注册', { userId: user.id, phone });
+      logger.info('新用户注册', { userId: user.id, phone: phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') });
     }
 
     // 检查封禁状态
@@ -85,6 +85,8 @@ const authService = {
     // 签发双 Token
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+
+    logger.info('用户登录', { userId: user.id, isNewUser });
 
     return {
       accessToken,
@@ -133,6 +135,8 @@ const authService = {
 
     const newAccessToken = generateAccessToken(user);
     const newRefreshToken = generateRefreshToken(user);
+
+    logger.info('Token 刷新', { userId: user.id });
 
     return {
       accessToken: newAccessToken,

@@ -13,6 +13,7 @@
 const reviewRepo = require('../repository/review');
 const orderRepo = require('../repository/order');
 const creditService = require('./credit');
+const logger = require('../utils/logger').business;
 const {
   notFound, invalidStatus, orderStateInvalid, duplicateReport,
 } = require('../utils/errors');
@@ -82,6 +83,8 @@ const reviewService = {
         { refId: data.order_id }
       );
     }
+
+    logger.info('评价创建', { reviewId: review.id, userId: reviewerId, orderId: data.order_id });
 
     return review;
   },

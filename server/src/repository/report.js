@@ -274,7 +274,13 @@ const reportRepo = {
     if (target_id) { conditions.push('al.target_id = ?'); params.push(target_id); }
     if (action) { conditions.push('al.action = ?'); params.push(action); }
     if (start_date) { conditions.push('al.created_at >= ?'); params.push(start_date); }
-    if (end_date) { conditions.push('al.created_at <= ?'); params.push(end_date); }
+    // 若 end_date 不含时间分量（如 '2026-06-11'），MySQL 会将其视为 00:00:00，
+    // 导致当天所有记录被排除。自动补齐 23:59:59 确保覆盖全天。
+    if (end_date) {
+      const end = end_date.includes(':') ? end_date : `${end_date} 23:59:59`;
+      conditions.push('al.created_at <= ?');
+      params.push(end);
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 

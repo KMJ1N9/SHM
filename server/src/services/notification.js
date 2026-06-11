@@ -15,7 +15,9 @@ const notificationService = {
    * @returns {Promise<{list: Array, total: number}>}
    */
   async list(userId, filters = {}) {
-    const { type, page = 1, pageSize = 20 } = filters;
+    const { type } = filters;
+    const page = parseInt(filters.page, 10) || 1;
+    const pageSize = Math.min(parseInt(filters.pageSize, 10) || 20, 50);
     const conditions = ['user_id = ?'];
     const params = [userId];
 

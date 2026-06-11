@@ -41,8 +41,11 @@ export const useUserStore = defineStore('user', {
     /** 是否可以发起交易（信誉分 ≥ 30） */
     canTrade: (state) => (state.user?.credit_score ?? 100) >= 30,
 
-    /** 是否为管理员（可访问工单管理/数据看板） */
-    isAdmin: (state) => state.user?.role === 'admin' || state.user?.role === 'cs',
+    /** 是否为管理员（可访问用户/商品/日志/敏感词/数据看板等管理功能） */
+    isAdmin: (state) => state.user?.role === 'admin',
+
+    /** 是否为客服或管理员（可访问工单管理） */
+    isCS: (state) => state.user?.role === 'cs' || state.user?.role === 'admin',
   },
 
   actions: {

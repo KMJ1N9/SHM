@@ -170,7 +170,8 @@
       <button
         v-if="!isOwner && product.status === 'active'"
         class="action-btn action-buy"
-        :disabled="submitting"
+        :class="{ 'action-btn--disabled': !userStore.canTrade }"
+        :disabled="submitting || !userStore.canTrade"
         @click="handleWant"
       >
         {{ submitting ? '处理中...' : '我想要' }}
@@ -318,12 +319,11 @@ function previewImages(index) {
 }
 
 /**
- * 跳转卖家个人主页（暂未实现）
+ * 跳转卖家个人主页
  */
 function goProfile() {
   if (product.value && product.value.seller) {
-    // TODO: 跳转用户个人主页
-    // uni.navigateTo({ url: `/pages/user/profile?id=${product.value.seller.id}` });
+    uni.navigateTo({ url: `/pages/user/profile?id=${product.value.seller.id}` });
   }
 }
 
@@ -441,22 +441,33 @@ async function handleWant() {
     return;
   }
 
-  // 2. 不能买自己的
+  // 2. 信誉分预检（前端 UX 优化，后端仍会二次校验）
+  if (!userStore.canTrade) {
+    uni.showModal({
+      title: '信誉分不足',
+      content: '你的信誉分低于 30，无法发起交易。请通过完成其他交易来恢复信誉分。',
+      showCancel: false,
+      confirmText: '我知道了',
+    });
+    return;
+  }
+
+  // 3. 不能买自己的
   if (isOwner.value) {
     uni.showToast({ title: '不能购买自己发布的商品', icon: 'none', duration: 1500 });
     return;
   }
 
-  // 3. 商品状态检查
+  // 4. 商品状态检查
   if (!product.value || product.value.status !== 'active') {
     uni.showToast({ title: '该商品当前不可交易', icon: 'none', duration: 1500 });
     return;
   }
 
-  // 4. 防重复提交
+  // 5. 防重复提交
   if (submitting.value) return;
 
-  // 5. 二次确认（防止误触）
+  // 6. 二次确认（防止误触）
   const { confirm } = await uni.showModal({
     title: '确认下单',
     content: '请确认是否要下单？下单后商品将标记为"正在交易"状态，其他人将无法购买。',
@@ -826,5 +837,11 @@ async function handleWant() {
   background: $color-bg;
   color: $color-body;
   border: 1px solid $color-divider;
+}
+
+.action-btn--disabled {
+  background: $color-divider !important;
+  color: $color-muted !important;
+  box-shadow: none !important;
 }
 </style>

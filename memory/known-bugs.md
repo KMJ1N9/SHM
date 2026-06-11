@@ -419,4 +419,41 @@ metadata:
 
 **Why:** BUG-025~030 全部已修复 ✅。第 6 轮真机测试 + 回归测试发现 6 个 Bug（P0×4 + P1×2），均已修复并验证通过。
 
-**How to apply:** 发现新 Bug 时按此格式追加。修复后标记 ✅ 并记录修复方案。详见 [[iteration3-audit]] [[iteration4-audit]] [[iteration5-audit]]。
+## BUG-031: 审计日志时间筛选 end_date 不含时间分量导致当天记录被排除 ✅ 已修复
+
+- **发现时间**: 2026-06-11（第 9 轮收尾验证）
+- **修复时间**: 2026-06-11
+- **位置**: [miniprogram/src/pages/admin/logs.vue:246-248](miniprogram/src/pages/admin/logs.vue#L246-L248) — computeEndDate() + [server/src/repository/report.js:276-283](server/src/repository/report.js#L276-L283) — listAdminLogs()
+- **严重程度**: P1（选"今天"筛选时所有当天日志被排除——MySQL 将 `'2026-06-11'` 视为 `00:00:00`，`<= '00:00:00'` 排除全天记录）
+- **根因**: `computeEndDate` 返回 `'2026-06-11'`（无时间分量），SQL `al.created_at <= '2026-06-11'` 等于 `<= '2026-06-11 00:00:00'`。
+- **修复**（纵深防御）:
+  1. 前端 `computeEndDate()` → `formatDateStr(new Date()) + ' 23:59:59'`
+  2. 后端 `listAdminLogs()` 自动检测：`end_date.includes(':')` 为 false 时自动追加 ` 23:59:59`
+
+## BUG-032: 头像保存后"我的"页面不刷新 ✅ 已修复
+
+- **发现时间**: 2026-06-11（第 9 轮收尾验证）
+- **修复时间**: 2026-06-11
+- **位置**: [miniprogram/src/pages/user/me.vue](miniprogram/src/pages/user/me.vue) — onShow + template
+- **严重程度**: P1（用户编辑资料保存头像后返回 Tab 页，头像仍显示旧图——WeChat Tab 页面可能被缓存，模板不自动重渲染）
+- **根因**: `me.vue` 的 `onShow` 只刷新未读通知数（`loadUnreadCount()`），不刷新用户资料。虽然 edit.vue 保存后调了 `getMeAction()` 更新 Pinia store，但 Tab 页可能使用缓存的渲染树。
+- **修复**（3 处）:
+  1. 导入 `resolveImageUrl` → 新增 `avatarUrl` computed（自动适配模拟器/真机 host 差异）
+  2. 模板改为 `:src="avatarUrl || defaultAvatar"`（使用解析后的 URL）
+  3. `onShow` 中增加 `userStore.getMeAction()` 调用（每次回到"我的"确保数据最新）
+
+## BUG-033: 微信渲染层报错 — addListener undefined + first rendering data 冲突 ✅ 已修复
+
+- **发现时间**: 2026-06-11（第 9 轮收尾验证）
+- **修复时间**: 2026-06-11
+- **位置**: [miniprogram/src/App.vue:61-69](miniprogram/src/App.vue#L61-L69) + [miniprogram/src/App.vue:97-113](miniprogram/src/App.vue#L97-L113)
+- **严重程度**: P2（控制台报错但功能正常——两个错误均源自渲染层初始化时序问题）
+- **根因（双错误）**:
+  1. `Cannot read property 'addListener' of undefined` → `uni.onNetworkStatusChange` 在 App.vue 加载时立即注册，微信小程序渲染层 listener 管道可能尚未初始化。底层 `VendorApp` 或 `NativeEvent` 对象未就绪。
+  2. `Expected updated data but get first rendering data` → `watch({ immediate: true })` 在首次渲染周期内调用 `uni.setTabBarBadge`，与微信渲染层 setData 时序冲突。
+- **修复**:
+  1. `uni.onNetworkStatusChange` 用 try/catch 包裹，降级为静默跳过（网络状态监听非核心功能）
+  2. 移除 `watch` 的 `{ immediate: true }`，改用 `nextTick()` 在首个渲染周期结束后设置初始角标
+- **验证**: ESLint 0 errors；build DONE。
+
+**How to apply:** 发现新 Bug 时按此格式追加。修复后标记 ✅ 并记录修复方案。详见 [[iteration3-audit]] [[iteration4-audit]] [[iteration5-audit]] [[project-state]]。

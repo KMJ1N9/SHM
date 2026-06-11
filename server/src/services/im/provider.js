@@ -10,6 +10,8 @@
  *   await imProvider.sendSystemMessage(userId, message);
  */
 
+const { internal } = require('../../utils/errors');
+
 // 获取当前 IM Provider 实现（默认腾讯云 IM）
 // 后续可通过环境变量 IM_PROVIDER 切换
 const providerName = process.env.IM_PROVIDER || 'tencent';
@@ -33,7 +35,7 @@ const provider = require(`./${providerName}`);
 const REQUIRED_METHODS = ['generateUserSig', 'createConversation', 'sendSystemMessage'];
 for (const method of REQUIRED_METHODS) {
   if (typeof provider[method] !== 'function') {
-    throw new Error(
+    throw internal(
       `[IM Provider] ${providerName}.js 未实现必需的 ${method}() 方法。`
     );
   }

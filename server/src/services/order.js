@@ -87,6 +87,8 @@ const orderService = {
       extra: { type: 'order', order_id: order.id, product_id: data.product_id },
     }).catch(err => logger.warn('IM 通知卖家失败', { orderId: order.id, error: err.message }));
 
+    logger.info('订单创建', { orderId: order.id, userId: buyerId, productId: data.product_id });
+
     return { order, created: true };
   },
 
@@ -153,6 +155,8 @@ const orderService = {
       extra: { type: 'order', order_id: orderId },
     }).catch(err => logger.warn('IM 通知面交失败', { orderId, error: err.message }));
 
+    logger.info('面交确认', { orderId, userId });
+
     return updated;
   },
 
@@ -198,6 +202,8 @@ const orderService = {
       .catch(err => logger.warn('IM 通知买家互评失败', { orderId, error: err.message }));
     imProvider.sendSystemMessage(sellerId, reviewMsg)
       .catch(err => logger.warn('IM 通知卖家互评失败', { orderId, error: err.message }));
+
+    logger.info('订单确认收货', { orderId, userId });
 
     return confirmed;
   },
@@ -248,6 +254,8 @@ const orderService = {
       content: `订单已被${cancelledBy === 'buyer' ? '买家' : '卖家'}取消`,
       extra: { type: 'order', order_id: orderId, status: 'cancelled' },
     }).catch(err => logger.warn('IM 通知取消失败', { orderId, error: err.message }));
+
+    logger.info('订单取消', { orderId, userId, cancelledBy });
 
     return cancelled;
   },
