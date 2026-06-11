@@ -84,8 +84,14 @@ class LRUCache {
 
   /**
    * 获取或设置（Cache-Aside 模式）
+   *
+   * 注意：fetchFn 不应返回 null/undefined —— 若返回 null，
+   * 会写入缓存（{value: null}），下次 get() 返回 null 触发
+   * `cached !== null` 判 false，导致每次调用都重新执行 fetchFn，
+   * 缓存永不命中。fetchFn 应返回有效值或抛出异常。
+   *
    * @param {string} key
-   * @param {function(): Promise<*>} fetchFn
+   * @param {function(): Promise<*>} fetchFn - 不应返回 null（返回有效值或 throw）
    * @param {number} [ttlMs]
    * @returns {Promise<*>}
    */

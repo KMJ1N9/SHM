@@ -5,6 +5,7 @@
  */
 
 const config = require('../config');
+const { cache } = require('../utils/cache');
 const userRepo = require('../repository/user');
 const creditRepo = require('../repository/credit');
 const { notFound } = require('../utils/errors');
@@ -79,6 +80,9 @@ const creditService = {
       previousScore,
       refId: opts.refId,
     });
+
+    // 缓存失效：用户信誉分变更后清除公开信息缓存
+    cache.delete(`user:public:${userId}`);
 
     return {
       previousScore,

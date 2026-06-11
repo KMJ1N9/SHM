@@ -6,6 +6,7 @@
 
 const config = require('../config');
 const db = require('../models/db');
+const { cache } = require('../utils/cache');
 const productRepo = require('../repository/product');
 const sensitiveFilter = require('../utils/sensitive-filter');
 const logger = require('../utils/logger').business;
@@ -64,40 +65,101 @@ function nestSeller(row) {
   return { ...result, seller };
 }
 
+/**
+ * 构建列表缓存 key（按 key 排序确保 JSON 序列化确定性）
+ * @param {Object} filters
+ * @returns {string}
+ */
+function buildListCacheKey(filters) {
+  const sortedKeys = Object.keys(filters).sort();
+  const sorted = {};
+  for (const k of sortedKeys) sorted[k] = filters[k];
+  return `products:list:${JSON.stringify(sorted)}`;
+}
+
 const productService = {
   /**
    * 商品列表（首页瀑布流 + 搜索 + 筛选 + 排序）
+   *
+   * 自动路由分页模式：
+   *   - filters.cursor 存在 → 游标分页（无缓存，O(1) 定位已足够）
+   *   - 无 cursor → 偏移分页（LRU 缓存，TTL 60s）
+   *
    * @param {Object} filters
-   * @returns {Promise<{list: Array, total: number, page: number, pageSize: number}>}
+   * @returns {Promise<{list: Array, total: number, page?: number, pageSize?: number, cursor?: number, hasMore?: boolean}>}
    */
   async list(filters) {
+    // 游标分页（无缓存 — 游标模式每次请求不同，缓存命中率低）
+    if (filters.cursor !== undefined) {
+      // 非 latest 排序下拒绝游标分页：cursor 基于 id，
+      // 而 priceAsc/priceDesc 以价格为主排序键，会导致数据遗漏。
+      // 复合游标 (price, id) 待后续实现。
+      if (filters.sort && filters.sort !== 'latest') {
+        throw badRequest('游标分页仅支持默认排序（latest）');
+      }
+      const result = await productRepo.listByCursor(filters);
+      result.list = result.list.map((row) => ({
+        ...nestSeller(row),
+        cover_image: extractCoverImage(row.images),
+      }));
+      return result;
+    }
+
+    // 偏移分页（有缓存 — 同一页+筛选组合命中率高）
     const page = Math.max(1, parseInt(filters.page, 10) || 1);
     const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(filters.pageSize, 10) || 20));
 
-    const result = await productRepo.list({ ...filters, page, pageSize });
+    const cacheKey = buildListCacheKey({ ...filters, page, pageSize });
 
-    // 转换响应格式：嵌套 seller + 添加 cover_image
-    result.list = result.list.map((row) => ({
-      ...nestSeller(row),
-      cover_image: extractCoverImage(row.images),
-    }));
-
-    return result;
+    return cache.getOrSet(cacheKey, async () => {
+      const data = await productRepo.list({ ...filters, page, pageSize });
+      data.list = data.list.map((row) => ({
+        ...nestSeller(row),
+        cover_image: extractCoverImage(row.images),
+      }));
+      return data;
+    }, 60 * 1000); // 60s TTL — 首页高并发，允许 1 分钟延迟
   },
 
   /**
-   * 商品详情
+   * 商品详情（含 LRU 缓存）
+   *
+   * 缓存策略：
+   *   - 仅缓存 status='active' 的商品（占绝大多数访问）
+   *   - off_shelf 不缓存（低频 + 不同 viewer 权限不同）
+   *   - 不存在的 ID 不缓存（防缓存穿透）
+   *   - 权限判断在缓存之外执行
+   *
    * @param {number} id
    * @param {Object} [viewer] - 当前登录用户（用于权限判断），可选
    * @returns {Promise<Object>}
    */
   async detail(id, viewer) {
-    const product = await productRepo.findById(id);
+    const cacheKey = `product:${id}`;
+
+    // 缓存命中 — 仍需 off_shelf 权限检查（防御性，正常不应缓存 off_shelf）
+    let product = cache.get(cacheKey);
+    if (product) {
+      if (product.status === 'off_shelf') {
+        if (!viewer || (viewer.id !== product.seller_id && viewer.role !== 'admin')) {
+          throw notFound('商品');
+        }
+      }
+      return nestSeller(product);
+    }
+
+    // 缓存 miss — 查询数据库
+    product = await productRepo.findById(id);
     if (!product) {
       throw notFound('商品');
     }
 
-    // off_shelf 商品仅卖家和管理员可见
+    // 仅缓存 active 商品（高频访问的绝大多数场景）
+    if (product.status === 'active') {
+      cache.set(cacheKey, product, 120 * 1000); // 120s TTL
+    }
+
+    // 权限判断（off_shelf 仅卖家和管理员可见）
     if (product.status === 'off_shelf') {
       if (!viewer || (viewer.id !== product.seller_id && viewer.role !== 'admin')) {
         throw notFound('商品');
@@ -155,6 +217,9 @@ const productService = {
       images,
     });
 
+    // 缓存失效：新商品发布后清除全部列表缓存（filter 组合 N 种，全部清除最安全）
+    cache.deleteByPrefix('products:list:');
+
     logger.info('商品发布', { productId: product.id, userId: sellerId });
 
     return nestSeller(product);
@@ -210,6 +275,10 @@ const productService = {
 
     const updated = await productRepo.update(productId, updates);
 
+    // 缓存失效：商品详情 + 全部列表缓存
+    cache.delete(`product:${productId}`);
+    cache.deleteByPrefix('products:list:');
+
     logger.info('商品编辑', { productId, userId });
 
     return nestSeller(updated);
@@ -242,6 +311,10 @@ const productService = {
 
       logger.info('商品删除', { productId, userId });
     });
+
+    // 缓存失效（事务成功后执行，cache 非事务性，与 DB 最终一致）
+    cache.delete(`product:${productId}`);
+    cache.deleteByPrefix('products:list:');
   },
 
   /**

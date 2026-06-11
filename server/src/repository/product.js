@@ -99,6 +99,97 @@ const productRepo = {
   },
 
   /**
+   * 游标分页商品列表（首页无限滚动场景）
+   *
+   * 使用 WHERE id < cursor ORDER BY id DESC 替代 LIMIT OFFSET，
+   * 避免大数据量下 OFFSET 的性能退化（O(n) 扫描跳过行）。
+   * COUNT 查询不含 cursor 条件（总数应统计全部符合条件的行）。
+   *
+   * @param {Object} filters - { cursor?, limit?, keyword?, category?, condition?, priceMin?, priceMax?, sort? }
+   * @returns {Promise<{list: Array, total: number, cursor: number|null, hasMore: boolean}>}
+   */
+  async listByCursor(filters) {
+    const {
+      keyword, category, condition, priceMin, priceMax, sort = 'latest',
+    } = filters;
+    const limit = Math.min(50, Math.max(1, parseInt(filters.limit, 10) || 20));
+    const rawCursor = parseInt(filters.cursor, 10);
+    const cursor = Number.isNaN(rawCursor) ? null : rawCursor;
+
+    const whereConditions = ['p.status = ?'];
+    const whereParams = ['active'];
+
+    // 游标条件（仅列表查询追加，COUNT 不参与）
+    let cursorClause = '';
+    const cursorParams = [];
+    if (cursor) {
+      cursorClause = 'AND p.id < ?';
+      cursorParams.push(cursor);
+    }
+
+    // 关键词搜索（FULLTEXT 优先，LIKE 兜底）
+    if (keyword) {
+      whereConditions.push(
+        '(MATCH(p.title, p.description) AGAINST(? IN BOOLEAN MODE) OR p.title LIKE ? OR u.nickname LIKE ? OR p.category LIKE ?)'
+      );
+      whereParams.push(keyword, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
+    }
+    if (category) {
+      whereConditions.push('p.category = ?');
+      whereParams.push(category);
+    }
+    if (condition) {
+      whereConditions.push('p.`condition` = ?');
+      whereParams.push(condition);
+    }
+    if (priceMin !== undefined) {
+      whereConditions.push('p.price >= ?');
+      whereParams.push(priceMin);
+    }
+    if (priceMax !== undefined) {
+      whereConditions.push('p.price <= ?');
+      whereParams.push(priceMax);
+    }
+
+    const where = `WHERE ${whereConditions.join(' AND ')}`;
+
+    // 排序（游标基于 id DESC，价格排序另行处理）
+    let orderBy;
+    switch (sort) {
+      case 'priceAsc':  orderBy = 'ORDER BY p.price ASC, p.id DESC'; break;
+      case 'priceDesc': orderBy = 'ORDER BY p.price DESC, p.id DESC'; break;
+      default:          orderBy = 'ORDER BY p.id DESC'; break;
+    }
+
+    // 列表查询（含游标条件，多取 1 条判断 hasMore）
+    const rows = await query(
+      `SELECT ${LIST_FIELDS}
+       FROM products p
+       JOIN users u ON p.seller_id = u.id
+       ${where} ${cursorClause}
+       ${orderBy}
+       LIMIT ?`,
+      [...whereParams, ...cursorParams, limit + 1]
+    );
+
+    const hasMore = rows.length > limit;
+    if (hasMore) rows.pop();
+
+    // COUNT 查询（不含游标条件，统计全部符合条件的行）
+    const [countRow] = await query(
+      `SELECT COUNT(*) AS total FROM products p JOIN users u ON p.seller_id = u.id ${where}`,
+      whereParams
+    );
+
+    return {
+      list: rows,
+      total: countRow.total,
+      cursor: rows.length > 0 ? rows[rows.length - 1].id : null,
+      hasMore,
+    };
+  },
+
+  /**
    * 商品详情（含卖家公开信息）
    * @param {number} id
    * @param {import('mysql2/promise').PoolConnection} [conn] - 事务连接（传入时自动加 FOR UPDATE 行锁）

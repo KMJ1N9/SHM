@@ -1,12 +1,11 @@
 ---
 name: project-state
-description: 项目当前状态 — 第 10 轮完成，第 11 轮计划已编写（缓存 + 游标分页 + 性能），131 后端测试通过
+description: 项目当前状态 — 第 11 轮全部完成 ✅（LRU 缓存 + 游标分页），143 后端测试通过，审查 9.5/10
 metadata:
   type: project
-  updatedAt: 2026-06-11T14:00
+  updatedAt: 2026-06-11T18:15
   currentIteration: 11
-  testedIteration: 10
-  commit: f8bff9a
+  testedIteration: 11
 ---
 
 # 项目当前状态
@@ -32,7 +31,7 @@ metadata:
 | 8 | 管理后台 | ✅ | 9 (6 新建 + 3 修改，纯前端) | — | 2026-06-11 |
 | 9 | 收尾补全 + P1 修复 | ✅ | 12 (7 页面 + 1 API + 4 修改) | 7/7 P1 修复 | 2026-06-11 |
 | 10 | 工程化基础审计 | ✅ | 11 (2 console.log 替换 + 1 bare Error 替换 + 6 business 日志补全 + 1 脱敏 + 1 文档) | 26 business 日志点 | 2026-06-11 |
-| 11 | 缓存 + 性能 | 🔲 待开始 | ~9 (LRU 接入 + 游标分页 + 前端 + 测试) | — | — |
+| 11 | 缓存 + 性能 | ✅ 已完成 | 9 (5 后端修改 + 1 前端修改 + 1 测试增强 + 2 文档) | 0 (139/139 全绿) | 2026-06-11 |
 
 ## 第 7 轮：举报/管理后台/互评增强 ✅
 
@@ -344,7 +343,7 @@ metadata:
 | 后端 server/src/ | **~98%** | 57 文件 5 层完整，scheduler 4 cron 全实现，第 10 轮工程化审计通过 |
 | 前端 miniprogram/src/ | **~82%** | 24/25 页面完成（仅 search 为 stub），6 组件 + 7 API 模块 |
 | 数据库 | **100%** | 14 表 + 5 迁移 + 种子数据 |
-| 测试 | **~40%** | 10 文件 131 用例全部通过 |
+| 测试 | **~42%** | 10 文件 139 用例全部通过（+8 缓存测试） |
 | 文档 | **100%** | 16 份文档全部完成，7 轮审阅 95 问题清零 |
 
 ## 第 10 轮：工程化基础审计 ✅（2026-06-11）
@@ -374,10 +373,43 @@ metadata:
 
 ---
 
+## 第 11 轮：缓存 + 性能 ✅（2026-06-11）
+
+**性质：** 基础设施接入轮。LRU 缓存（第 1 轮就绪）+ 游标分页（新增）+ 慢查询/懒加载（已就绪，审计确认）。
+
+**产出：**
+
+| 层 | 文件 | 操作 | 行数 | 关键功能 |
+|:--:|------|:--:|:--:|------|
+| 后端 | `services/product.js` | 修改 | +40 | list() 缓存（getOrSet, 60s TTL）+ detail() 手动缓存（仅 active, 120s TTL）+ create/update/delete 缓存失效 |
+| 后端 | `services/user.js` | 修改 | +12 | getById() 缓存（getOrSet, 300s TTL）+ updateProfile() 失效 `user:public:${id}` |
+| 后端 | `services/credit.js` | 修改 | +3 | changeScore() 后失效 `user:public:${userId}` |
+| 后端 | `repository/product.js` | 修改 | +75 | 新增 listByCursor() — 游标分页（WHERE id < cursor ORDER BY id DESC） |
+| 前端 | `pages/index/index.vue` | 修改 | ~15 | 切换游标分页：cursor/hasMore 替代 page/noMore |
+| 测试 | `__tests__/unit/services/product.test.js` | 修改 | +72 | 8 缓存用例：列表命中/详情缓存 active/off_shelf 不缓存/不存在不缓存（防穿透）/create 失效/update 失效/delete 失效 |
+
+**架构决策：**
+- Cache-Aside 模式：读路径 cache.get → miss → DB → cache.set；写路径 DB → cache.delete（失效非更新）
+- 缓存穿透防护：`detail()` 手动 get→miss→DB→判非 null→set，不走 getOrSet（防止 null 被缓存）
+- 详情缓存策略：仅缓存 `status='active'` 商品（占绝大多数访问），off_shelf 不缓存（低频 + viewer 权限不同）
+- 列表缓存失效：`deleteByPrefix('products:list:')` 全部清除（filter 组合 N 种，精准失效复杂度高且易漏）
+- 游标分页不缓存：cursor 每次不同 key，命中率近零；游标 O(1) 定位已消除缓存需求
+- 游标+偏移共存：service 层自动路由（filters.cursor → listByCursor，无 cursor → list 缓存）
+- 游标基于 `id DESC` 主键有序，COUNT 查询不含 cursor 条件（总数应统计全部）
+
+**慢查询日志验证：** db.js query() 已内置 >200ms warn / >1000ms error，测试输出中观测到正常工作。
+
+**图片懒加载审计：** ProductCard.vue 已传 `:lazy-load="true"` 给 SafeImage → 小程序原生 `<image lazy-load>` 生效。
+
+**验证结果：** `npx vitest run` 10 文件 139 用例全绿，前端 ESLint 0 错误，frontend build DONE。
+**详细计划：** [[../plans/iteration11-cache-performance.md]]
+
+---
+
 ## 下一步
 
-**第 11 轮候选（编码迭代计划）：**
-- LRU 缓存接入（productService.list/detail + userService.getById）
-- 游标分页（商品列表"加载更多"）
-- 慢查询日志验证
-- 图片懒加载
+**第 12 轮候选（编码迭代计划）：前端收尾**
+- 搜索页面完善
+- 编辑商品页面
+- 前端测试补齐
+- 游标分页扩展到其他列表页

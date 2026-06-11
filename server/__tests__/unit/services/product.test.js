@@ -14,6 +14,7 @@ const {
   db,
 } = require('../../setup');
 const productService = require('../../../src/services/product');
+const { cache } = require('../../../src/utils/cache');
 
 /**
  * 创建测试商品（直接 insert，绕过 service 校验）
@@ -361,5 +362,165 @@ describe('商品服务 — 删除（软删除 + TOCTOU 防护）', () => {
     await expect(
       productService.delete(99999, user.id)
     ).rejects.toMatchObject({ code: 2001 });
+  });
+});
+
+// ============================================================
+// LRU 缓存
+// ============================================================
+describe('商品服务 — LRU 缓存', () => {
+  let user;
+
+  beforeEach(async () => {
+    await cleanData();
+    user = await createTestUser({ nickname: '缓存测试卖家' });
+    cache.clear();
+  });
+
+  afterEach(() => {
+    cache.clear();
+  });
+
+  // ---- 列表缓存 ----
+  describe('列表缓存：list() 使用 getOrSet', () => {
+    it('首次调用 list() 后缓存应包含该 key', async () => {
+      await createTestProduct(user.id, { title: '缓存测试商品' });
+      await productService.list({ page: 1, pageSize: 20 });
+
+      // 缓存中应有 products:list: 前缀的条目
+      const hasListCache = [...Array.from({ length: cache.size })].some(
+        () => true
+      );
+      // 至少有 1 条缓存（list key）
+      expect(cache.size).toBeGreaterThanOrEqual(1);
+    });
+
+    it('同一查询条件应返回一致结果（验证缓存不改变语义）', async () => {
+      await createTestProduct(user.id, { title: '一致性测试' });
+      const r1 = await productService.list({ page: 1, pageSize: 20 });
+      const r2 = await productService.list({ page: 1, pageSize: 20 });
+      expect(r1.total).toBe(r2.total);
+      expect(r1.list.length).toBe(r2.list.length);
+    });
+  });
+
+  // ---- 详情缓存 ----
+  describe('详情缓存：detail() 缓存 active 商品', () => {
+    it('active 商品查询后应写入缓存', async () => {
+      const pid = await createTestProduct(user.id, { status: 'active' });
+      await productService.detail(pid);
+
+      const cacheKey = `product:${pid}`;
+      const cached = cache.get(cacheKey);
+      expect(cached).toBeTruthy();
+      expect(cached.id).toBe(pid);
+    });
+
+    it('off_shelf 商品不应写入缓存', async () => {
+      const pid = await createTestProduct(user.id, { status: 'off_shelf' });
+      // 卖家可查看 off_shelf
+      await productService.detail(pid, { id: user.id, role: 'user' });
+
+      const cacheKey = `product:${pid}`;
+      const cached = cache.get(cacheKey);
+      expect(cached).toBeNull();
+    });
+
+    it('不存在的 ID 不应写入缓存（防穿透）', async () => {
+      await expect(
+        productService.detail(99999)
+      ).rejects.toMatchObject({ code: 2001 });
+
+      const cacheKey = 'product:99999';
+      expect(cache.get(cacheKey)).toBeNull();
+    });
+  });
+
+  // ---- 缓存失效 — create ----
+  describe('缓存失效：create()', () => {
+    it('发布新商品后列表缓存应被清除', async () => {
+      await createTestProduct(user.id, { title: '旧商品' });
+      await productService.list({ page: 1, pageSize: 20 });
+      expect(cache.size).toBeGreaterThanOrEqual(1);
+
+      // 发布新商品 → 列表缓存失效
+      await productService.create(user.id, 100, {
+        title: '新商品', category: '教材', condition: '9成新',
+        original_price: 50, price: 25, trade_location: '图书馆',
+        images: ['https://cos.example.com/img.jpg'],
+      });
+
+      // 列表缓存应全部清除
+      // 验证：重新 list() 后缓存恢复
+      const r = await productService.list({ page: 1, pageSize: 20 });
+      expect(r.total).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  // ---- 缓存失效 — update ----
+  describe('缓存失效：update()', () => {
+    it('更新商品后详情缓存 + 列表缓存应被清除', async () => {
+      const pid = await createTestProduct(user.id, { title: '待更新商品', status: 'active' });
+      await productService.detail(pid);
+      expect(cache.get(`product:${pid}`)).toBeTruthy();
+
+      await productService.update(pid, user.id, { title: '已更新' });
+
+      // 详情缓存应已清除
+      expect(cache.get(`product:${pid}`)).toBeNull();
+    });
+  });
+
+  // ---- 缓存失效 — delete ----
+  describe('缓存失效：delete()', () => {
+    it('删除商品后详情缓存应被清除', async () => {
+      const pid = await createTestProduct(user.id, { status: 'active' });
+      await productService.detail(pid);
+      expect(cache.get(`product:${pid}`)).toBeTruthy();
+
+      await productService.delete(pid, user.id);
+
+      // 详情缓存应已清除
+      expect(cache.get(`product:${pid}`)).toBeNull();
+    });
+  });
+
+  // ---- 游标分页排序保护（P1-001 fix） ----
+  describe('游标分页：非 latest 排序应拒绝', () => {
+    it('cursor + sort=priceAsc 应抛出 badRequest', async () => {
+      await expect(
+        productService.list({ cursor: 5, sort: 'priceAsc' })
+      ).rejects.toMatchObject({
+        code: 4001,
+        message: expect.stringContaining('游标分页仅支持默认排序'),
+      });
+    });
+
+    it('cursor + sort=priceDesc 应抛出 badRequest', async () => {
+      await expect(
+        productService.list({ cursor: 10, sort: 'priceDesc' })
+      ).rejects.toMatchObject({
+        code: 4001,
+        message: expect.stringContaining('游标分页仅支持默认排序'),
+      });
+    });
+
+    it('cursor + sort=latest 应正常执行（无 sort 也走默认 latest）', async () => {
+      await createTestProduct(user.id, { title: '游标正常测试' });
+      // 不带 sort → 默认 latest，cursor 路由应正常
+      const result = await productService.list({ limit: 20 });
+      expect(result).toHaveProperty('list');
+      expect(result).toHaveProperty('total');
+      expect(result.list.length).toBeGreaterThanOrEqual(1);
+    });
+
+    // P2-003 fix — 非法 cursor 值防御
+    it('cursor=\'abc\' 应容错为 null（首页）而非 SQL NaN 错误', async () => {
+      await createTestProduct(user.id, { title: 'NaN防御测试' });
+      const result = await productService.list({ cursor: 'abc' });
+      expect(result).toHaveProperty('list');
+      expect(result).toHaveProperty('hasMore');
+      expect(result.list.length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

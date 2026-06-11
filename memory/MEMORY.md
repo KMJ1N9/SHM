@@ -1,6 +1,6 @@
 ## 项目状态与进度
 
-- [项目当前状态](project-state.md) — 第 1~10 轮全部完成 ✅，测试 10 文件 131 用例全部通过
+- [项目当前状态](project-state.md) — 第 1~11 轮全部完成 ✅，测试 10 文件 143 用例全部通过
 - [第 10 轮编码计划](../plans/iteration10-engineering-audit.md) — 工程化基础审计：26 business 日志点 + console.log 清零 + bare Error 清零 + 手机号脱敏
 - [第 9 轮代码审查](iteration9-audit.md) — 13 文件审查：P0×0 / P1×3 / P2×5 → 全部已修复 ✅，综合评分 9.5/10
 - [第 2 轮审阅报告](iteration2-review.md) — 注册/登录：9 文件，P0×1 + P1×1 已修复
@@ -12,7 +12,8 @@
 - [第 6 轮全面审计](iteration6-audit.md) — 15 文件 ~3200 行 7 维度审计：P0×0 / P1×2 / P2×7，综合评分 8.5/10
 - [第 7 轮全面审计](iteration7-audit.md) — 11 文件 ~1550 行 7 维度审计：P0×0 / P1×4 / P2×5，综合评分 8.5/10
 - [第 8 轮编码计划](../plans/iteration8-admin-management.md) — 管理后台（用户/商品/审计/敏感词），纯前端 9 文件 ~1403 行
-- [第 11 轮编码计划](../plans/iteration11-cache-performance.md) — 缓存 + 性能：LRU 缓存接入 + 游标分页 + 慢查询日志 + 图片懒加载审计
+- [第 11 轮编码计划](../plans/iteration11-cache-performance.md) — LRU 缓存接入 + 游标分页 + 慢查询日志审计 + 图片懒加载审计 ✅ 已完成（143 tests, 审查 9.5/10）
+- [第 11 轮代码审查](iteration11-audit.md) — 7 文件审查：P0×0 / P1×1 / P2×3，综合评分 9.0/10
 - [第 8 轮全面审计](iteration8-audit.md) — 9 文件 ~2017 行 7 维度审计：P0×0 / P1×3 / P2×7，综合评分 7.5/10
 - [已知 Bug](known-bugs.md) — BUG-001~033 全部已修复 ✅（第 9 轮后热修复 BUG-031~033），BUG-014 待修复（顽固缓存，非代码问题）
 

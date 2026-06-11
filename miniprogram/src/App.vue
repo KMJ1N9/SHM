@@ -30,6 +30,29 @@ const userStore = useUserStore();
 const appStore = useAppStore();
 
 // ============================================================
+// 登录态监听 — 冷启动登录后自动初始化 IM
+// ============================================================
+//
+// 冷启动时序：
+//   onLaunch → initAuth() 无 Token → isLoggedIn=false → 跳转登录页 → return
+//   → onShow 触发时 isLoggedIn 仍为 false → 无法初始化 IM
+//   → 用户登录成功 → loginAction() 写入 Token + user → isLoggedIn 变为 true
+//
+// watch 在此刻触发 initIM()，IM 在用户点击消息页之前就已开始初始化。
+// onLaunch 的 initIM() 保留（热启动路径），onShow 的 initIM() 保留（后台恢复路径）。
+// initIM() 内部有 isReady / isInitializing 守卫，多条路径并发安全。
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) {
+      initIM().catch((err) => {
+        console.warn('[App] IM 初始化失败:', err.message || err);
+      });
+    }
+  }
+);
+
+// ============================================================
 // 生命周期
 // ============================================================
 
@@ -75,6 +98,13 @@ onShow(() => {
 
   // 前台恢复时刷新通知未读
   if (userStore.isLoggedIn) {
+    // 确保 IM 已初始化（覆盖冷启动登录场景：
+    // onLaunch 检测未登录 → 提前 return 跳过了 initIM()，
+    // 用户登录后 switchTab 到这里时 IM 仍未初始化）
+    initIM().catch((err) => {
+      console.warn('[App] IM 初始化失败:', err.message || err);
+    });
+
     fetchNotifyUnread();
     startNotifyPolling();
   }

@@ -70,7 +70,7 @@
         — 暂无商品 —
       </text>
     </view>
-    <view v-else-if="noMore" class="load-more">
+    <view v-else-if="!hasMore" class="load-more">
       <text class="load-more-text">
         — 没有更多了 —
       </text>
@@ -131,12 +131,9 @@ const showFilter = ref(false);
 
 /** 商品列表 */
 const list = ref([]);
-const page = ref(1);
-const total = ref(0);
+const cursor = ref(null);
 const loading = ref(false);
-const noMore = ref(false);
-
-const pageSize = 20;
+const hasMore = ref(true);
 
 /** 左列商品（奇数索引） */
 const leftList = computed(() => list.value.filter((_, i) => i % 2 === 0));
@@ -145,27 +142,34 @@ const leftList = computed(() => list.value.filter((_, i) => i % 2 === 0));
 const rightList = computed(() => list.value.filter((_, i) => i % 2 === 1));
 
 /**
- * 加载商品列表
- * @param {boolean} [reset=false] — 是否重置（下拉刷新时重置）
+ * 加载商品列表（游标分页：无限滚动）
+ *
+ * 使用 cursor 替代 page 实现 O(1) 定位，避免大数据量下
+ * OFFSET 的性能退化。每次返回 cursor（上一页最后一条 id）
+ * 和 hasMore 标志。
+ *
+ * @param {boolean} [reset=false] — 是否重置（下拉刷新/筛选切换时重置）
  */
 async function loadProducts(reset = false) {
   if (loading.value) return;
-  if (!reset && noMore.value) return;
-
-  // 先计算目标页码，成功后再持久化 — 防止请求失败时跳过一整页
-  const targetPage = reset ? 1 : page.value + 1;
+  if (!reset && !hasMore.value) return;
 
   if (reset) {
-    noMore.value = false;
+    cursor.value = null;
+    list.value = [];
+    hasMore.value = true;
   }
 
   loading.value = true;
   try {
     const params = {
-      page: targetPage,
-      pageSize,
+      limit: 20,
       sort: 'latest',
     };
+    // 非重置时传入游标
+    if (!reset && cursor.value) {
+      params.cursor = cursor.value;
+    }
     // 侧边栏筛选优先，回退到顶部 Tab
     const category = filters.category || activeCategory.value;
     if (category) params.category = category;
@@ -180,15 +184,9 @@ async function loadProducts(reset = false) {
     } else {
       list.value = [...list.value, ...(data.list || [])];
     }
-    total.value = data.total || 0;
 
-    // 请求成功后才推进页码
-    page.value = targetPage;
-
-    // 判断是否已加载全部：返回条数 < pageSize 即已到末页（与 my.vue 保持一致）
-    if ((data.list || []).length < pageSize) {
-      noMore.value = true;
-    }
+    cursor.value = data.cursor;
+    hasMore.value = data.hasMore;
   } catch (err) {
     uni.showToast({ title: err.message || '加载失败', icon: 'none', duration: 1500 });
   } finally {
@@ -246,7 +244,7 @@ onPullDownRefresh(() => {
  * 触底加载更多
  */
 onReachBottom(() => {
-  if (!noMore.value && !loading.value) {
+  if (hasMore.value && !loading.value) {
     loadProducts(false);
   }
 });
