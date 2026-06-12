@@ -56,6 +56,11 @@
         <text class="menu-label">我的举报</text>
         <text class="menu-arrow">›</text>
       </view>
+      <view class="menu-item" @click="goContactCS">
+        <text class="menu-icon">🎧</text>
+        <text class="menu-label">联系客服</text>
+        <text class="menu-arrow">›</text>
+      </view>
       <view class="menu-item" @click="goNotifications">
         <text class="menu-icon">🔔</text>
         <text class="menu-label">通知中心</text>
@@ -120,6 +125,8 @@ import { onShow } from '@dcloudio/uni-app';
 import { useUserStore } from '@/store/user';
 import { resolveImageUrl } from '@/api/index';
 import { unreadCount } from '@/api/notification';
+import { getCSContact, ensureAccount } from '@/api/im';
+import { isIMReady, reInitIM, cachePeerProfile } from '@/utils/im';
 
 const userStore = useUserStore();
 const user = computed(() => userStore.user);
@@ -194,6 +201,51 @@ function goSettings() {
 
 function goReports() {
   uni.navigateTo({ url: '/pages/report/list' });
+}
+
+async function goContactCS() {
+  // 1. 检查登录
+  if (!userStore.isLoggedIn) {
+    uni.showToast({ title: '请先登录', icon: 'none' });
+    return;
+  }
+
+  // 2. 检查 IM 就绪
+  if (!isIMReady()) {
+    uni.showToast({ title: '消息服务连接中…', icon: 'none', duration: 2000 });
+    try {
+      await reInitIM();
+    } catch (err) {
+      console.error('[goContactCS] IM 初始化失败:', err.message);
+      uni.showToast({ title: '消息服务连接失败，请稍后重试', icon: 'none' });
+      return;
+    }
+  }
+
+  // 3. 获取客服信息
+  let cs;
+  try {
+    cs = await getCSContact();
+  } catch (err) {
+    console.error('[goContactCS] 获取客服信息失败:', err.message);
+    uni.showToast({ title: '客服暂时不在线，请稍后重试', icon: 'none' });
+    return;
+  }
+
+  if (!cs || !cs.id) {
+    uni.showToast({ title: '暂无客服在线', icon: 'none' });
+    return;
+  }
+
+  // 4. 确保 IM 账号 + 缓存资料
+  const conversationID = `C2C${cs.id}`;
+  cachePeerProfile(cs.id, cs.nickname, cs.avatar);
+  ensureAccount(cs.id, cs.nickname, cs.avatar).catch(() => {});
+
+  // 5. 跳转聊天页
+  uni.navigateTo({
+    url: `/pages/chat/detail?conversationId=${conversationID}&nickname=${encodeURIComponent(cs.nickname)}&avatar=${encodeURIComponent(cs.avatar || '')}`,
+  });
 }
 
 function goNotifications() {

@@ -1,8 +1,10 @@
 /**
  * IM 接口封装
  *
- * 暴露 1 个接口：
- *   - getUserSig() — 获取当前用户的 IM UserSig（用于 IM SDK 登录）
+ * 暴露 3 个接口：
+ *   - getUserSig()      — 获取当前用户的 IM UserSig（用于 IM SDK 登录）
+ *   - ensureAccount()   — 确保指定用户的 IM 账号已导入
+ *   - getCSContact()    — 获取客服联系方式
  */
 
 import { get, post } from './index';
@@ -13,6 +15,14 @@ import { get, post } from './index';
  */
 export function getUserSig() {
   return get('/im/user-sig');
+}
+
+/**
+ * 获取客服联系方式（ID + 昵称 + 头像）
+ * @returns {Promise<{id: number, nickname: string, avatar: string}>}
+ */
+export function getCSContact() {
+  return get('/users/cs/contact');
 }
 
 /**

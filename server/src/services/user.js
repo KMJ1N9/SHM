@@ -30,6 +30,18 @@ const userService = {
   },
 
   /**
+   * 获取客服联系方式（IM 聊天用）
+   * @returns {Promise<{id: number, nickname: string, avatar: string}>}
+   */
+  async getCSContact() {
+    const cs = await userRepo.findCSUser();
+    if (!cs) {
+      throw notFound('客服');
+    }
+    return { id: cs.id, nickname: cs.nickname, avatar: cs.avatar || '' };
+  },
+
+  /**
    * 编辑个人资料
    * @param {number} userId
    * @param {Object} updates - { nickname?, avatar?, class_name?, dorm_building? }

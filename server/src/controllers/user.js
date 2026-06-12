@@ -18,6 +18,18 @@ const userController = {
   },
 
   /**
+   * GET /api/users/cs/contact — 获取客服联系方式
+   */
+  async getCSContact(req, res, next) {
+    try {
+      const cs = await userService.getCSContact();
+      res.json({ code: 0, message: 'ok', data: cs });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  /**
    * PUT /api/users/me — 编辑个人资料
    */
   async updateProfile(req, res, next) {

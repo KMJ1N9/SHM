@@ -9,6 +9,13 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
+// 从环境变量读取数据库密码（禁止硬编码）
+const DB_PASS = process.env.DB_PASSWORD || '';
+if (!DB_PASS) {
+  console.error('请设置 DB_PASSWORD 环境变量');
+  process.exit(1);
+}
+
 const DATADIR = 'D:\\MySQL\\MySQL Server 8.0 data\\Data';
 const BINLOG_PREFIX = path.join(DATADIR, 'DESKTOP-ID19Q6A-bin');
 const DB_NAME = 'campus_market_dev';
@@ -127,7 +134,7 @@ console.log(`文件大小: ${(fs.statSync(OUT_FILE).size / 1024 / 1024).toFixed(
 console.log('\n正在应用到数据库...');
 try {
   const result = execSync(
-    `mysql -u root -p12345678 --force ${DB_NAME} < "${OUT_FILE}" 2>&1`,
+    `mysql -u root -p${DB_PASS} --force ${DB_NAME} < "${OUT_FILE}" 2>&1`,
     { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024, timeout: 300000, shell: 'cmd.exe' }
   );
   if (result.trim()) {
