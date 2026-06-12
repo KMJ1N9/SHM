@@ -5,12 +5,15 @@
  *   npx vitest run          # 单次运行
  *   npx vitest              # 监听模式
  *   npx vitest run --coverage  # 覆盖率（需安装 @vitest/coverage-v8）
+ *
+ * 注意：使用 CommonJS 格式（非 ESM），因为项目 package.json 未设置
+ * "type": "module"，且 uni-app 构建依赖 CJS 环境。
  */
 
-import { defineConfig } from 'vitest/config';
-import { resolve } from 'path';
+const { defineConfig } = require('vitest/config');
+const { resolve } = require('path');
 
-export default defineConfig({
+module.exports = defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
