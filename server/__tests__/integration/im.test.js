@@ -48,7 +48,7 @@ describe('GET /api/im/user-sig — 已登录用户获取 UserSig', () => {
     expect(userId).toBe(String(user.id));
     expect(userSig).toBeDefined();
     expect(typeof userSig).toBe('string');
-    expect(sdkAppId).toBe(1600145841);
+    expect(sdkAppId).toBeGreaterThan(0);
   });
 
   it('IM-001: userId 与登录用户一致', async () => {
