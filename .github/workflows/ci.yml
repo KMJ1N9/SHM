@@ -13,15 +13,15 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
           MYSQL_DATABASE: campus_market_test
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -ptest_password"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-cmd "mysqladmin ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,6 @@ jobs:
           echo "DB_HOST=127.0.0.1" >> server/.env.test
           echo "DB_PORT=3306" >> server/.env.test
           echo "DB_USER=root" >> server/.env.test
-          echo "DB_PASSWORD=test_password" >> server/.env.test
           echo "DB_NAME=campus_market_test" >> server/.env.test
           echo "JWT_ACCESS_SECRET=ci-test-access-secret-64chars" >> server/.env.test
           echo "JWT_REFRESH_SECRET=ci-test-refresh-secret-64chars" >> server/.env.test
