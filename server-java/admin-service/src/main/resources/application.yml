@@ -1,0 +1,67 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: admin-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/campus_market_dev?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+  flyway:
+    enabled: false
+
+# JWT 密钥（与 core-service 共用同一套密钥，可通过 Nacos 配置中心统一管理）
+jwt:
+  access-secret: ${JWT_ACCESS_SECRET}
+  refresh-secret: ${JWT_REFRESH_SECRET}
+
+# 信誉分配置（与 core-service CreditProperties 默认值一致，可通过 Nacos 统一管理）
+credit:
+  max: ${CREDIT_MAX:200}
+
+# ============================================================
+# 管理员自动提升 — 手机号白名单（逗号分隔），与 core-service 一致
+# 匹配的手机号在首次访问管理后台时自动提升为 admin 角色
+# ============================================================
+admin:
+  auto-phones: ${ADMIN_AUTO_PHONES:}
+
+# ============================================================
+# 内部 API 共享密钥（与 im-connector 一致）
+# 通过 Feign RequestInterceptor 注入 X-Internal-Token 请求头
+# ============================================================
+internal:
+  token: ${INTERNAL_TOKEN:}
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.shm.common.model.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+# ── Sentinel 熔断 (Phase 9) ──
+spring.cloud.sentinel:
+  transport:
+    dashboard: ${SENTINEL_DASHBOARD:localhost:8088}
+    port: 8722
+    client-ip: 127.0.0.1
+  eager: true
+
+# Feign + Sentinel 熔断 (Phase 9)
+feign:
+  sentinel:
+    enabled: true

@@ -2,11 +2,15 @@
   <view class="seller-section">
     <text class="section-title">卖家信息</text>
     <view class="seller-card" @click="goProfile">
-      <image
+      <SafeImage
+        v-if="seller.avatar"
         class="seller-avatar"
-        :src="seller.avatar || defaultAvatar"
+        :src="resolveImageUrl(seller.avatar)"
         mode="aspectFill"
       />
+      <view v-else class="seller-avatar seller-avatar--default">
+        <text class="seller-avatar-emoji">👤</text>
+      </view>
       <view class="seller-info">
         <text class="seller-name">{{ seller.nickname }}</text>
         <text v-if="seller.class_name" class="seller-detail">{{ seller.class_name }}</text>
@@ -27,12 +31,13 @@
 
 <script setup>
 import { useUserStore } from '@/store/user';
+import { resolveImageUrl } from '@/api/index';
+import SafeImage from '@/components/SafeImage.vue';
 
 const props = defineProps({
   seller: { type: Object, default: null },
   isOwner: { type: Boolean, default: false },
   productId: { type: Number, default: 0 },
-  defaultAvatar: { type: String, default: '' },
 });
 
 const userStore = useUserStore();
@@ -84,6 +89,16 @@ function goReport() {
   border-radius: 50%;
   background: $color-divider;
   flex-shrink: 0;
+}
+
+.seller-avatar--default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seller-avatar-emoji {
+  font-size: 44rpx;
 }
 
 .seller-info {

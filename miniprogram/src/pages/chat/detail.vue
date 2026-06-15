@@ -56,10 +56,10 @@
         >
           <!-- 对方头像（收到的消息） -->
           <view v-if="msg.flow === 'in'" class="msg-avatar-wrap">
-            <image
+            <SafeImage
               v-if="peerAvatar && !avatarFailed"
               class="msg-avatar"
-              :src="peerAvatar"
+              :src="resolveImageUrl(peerAvatar)"
               mode="aspectFill"
               @error="onAvatarError"
             />
@@ -87,8 +87,21 @@
             </text>
           </view>
 
-          <!-- 自己消息的占位（与对方头像对称，保持布局一致） -->
-          <view v-if="msg.flow === 'out'" class="msg-avatar-wrap msg-avatar-wrap--spacer" />
+          <!-- 自己头像（发出的消息） -->
+          <view v-if="msg.flow === 'out'" class="msg-avatar-wrap msg-avatar-wrap--self">
+            <SafeImage
+              v-if="myAvatar && !myAvatarFailed"
+              class="msg-avatar"
+              :src="resolveImageUrl(myAvatar)"
+              mode="aspectFill"
+              @error="onMyAvatarError"
+            />
+            <view v-else class="msg-avatar msg-avatar--placeholder">
+              <text class="msg-avatar-emoji">
+                👤
+              </text>
+            </view>
+          </view>
         </view>
       </view>
 
@@ -138,9 +151,12 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { onLoad, onShow, onHide, onUnload } from '@dcloudio/uni-app';
 import TIM from 'tim-wx-sdk';
+import { resolveImageUrl } from '@/api/index';
+import SafeImage from '@/components/SafeImage.vue';
+import { useUserStore } from '@/store/user';
 import {
   getTim,
   isIMReady,
@@ -166,6 +182,18 @@ const peerAvatar = ref('');
 
 /** 头像加载失败标记 */
 const avatarFailed = ref(false);
+
+/** 我的头像加载失败标记 */
+const myAvatarFailed = ref(false);
+
+// ============================================================
+// 当前用户
+// ============================================================
+
+const userStore = useUserStore();
+
+/** 当前登录用户的头像 URL */
+const myAvatar = computed(() => userStore.user?.avatar || '');
 
 // ============================================================
 // 消息状态
@@ -534,6 +562,13 @@ function getSystemMsgText(msg) {
 function onAvatarError() {
   avatarFailed.value = true;
 }
+
+/**
+ * 我的头像加载失败回退
+ */
+function onMyAvatarError() {
+  myAvatarFailed.value = true;
+}
 </script>
 
 <style lang="scss">
@@ -626,8 +661,14 @@ function onAvatarError() {
   justify-content: flex-end;
 }
 
-// ── 头像 ────────────────────────────────────────────────────
+// ── 头像 — 尺寸定义在 wrapper 上，防止 SafeImage scoped CSS
+//     (.safe-image { width:100%; height:100% }，特异性 0,2,0)
+//     覆盖父级非 scoped .msg-avatar { width:72rpx }（特异性 0,1,0）
+//     导致图片加载失败时元素塌陷为零尺寸。
+// ──────────────────────────────────────────────────────────────
 .msg-avatar-wrap {
+  width: 72rpx;
+  height: 72rpx;
   flex-shrink: 0;
   margin-right: 16rpx;
 
@@ -636,11 +677,16 @@ function onAvatarError() {
     margin-left: 16rpx;
     visibility: hidden;
   }
+
+  &--self {
+    margin-right: 0;
+    margin-left: 16rpx;
+  }
 }
 
 .msg-avatar {
-  width: 72rpx;
-  height: 72rpx;
+  width: 100%;
+  height: 100%;
   border-radius: $radius-full;
   background: $color-divider;
 

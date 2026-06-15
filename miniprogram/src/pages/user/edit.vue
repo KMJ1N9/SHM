@@ -4,10 +4,10 @@
     <view class="edit-section">
       <view class="edit-section-title">头像</view>
       <view class="avatar-row" @click="onChangeAvatar">
-        <image
+        <SafeImage
           v-if="form.avatar"
           class="avatar-img"
-          :src="form.avatar"
+          :src="resolveImageUrl(form.avatar)"
           mode="aspectFill"
         />
         <view v-else class="avatar-placeholder">
@@ -76,7 +76,9 @@
 import { ref, reactive } from 'vue';
 import { useUserStore } from '@/store/user';
 import { updateProfile } from '@/api/user';
+import { resolveImageUrl } from '@/api/index';
 import { chooseAndUpload } from '@/utils/cos';
+import SafeImage from '@/components/SafeImage.vue';
 
 const userStore = useUserStore();
 

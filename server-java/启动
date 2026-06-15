@@ -1,0 +1,45 @@
+完整启动流程
+前提条件
+MySQL 已开机自启（确认 127.0.0.1:3306 可连）
+Redis 如需缓存需启动（D:\redis-7.4.3\redis-server.exe，非必须）
+
+1. 环境变量
+在 server-java/ 目录下，确保 .env 文件存在（已验证），每次启动前加载：
+cd "d:\学习资料\AI AGENT\项目\SHM\server-java"
+set -a && source .env && set +a
+
+2. 启动 Nacos
+startup.cmd -m standalone
+等待 15-20 秒，验证：curl http://localhost:8848/nacos/（出现 HTML 即成功）
+
+3. 重新编译（应用本次修改）
+cd "d:\学习资料\AI AGENT\项目\SHM\server-java"
+mvn clean install -DskipTests
+注意：项目当前配置下，mvn package 产出的 jar 是 thin jar（~100KB），不包含依赖。需要用 mvn spring-boot:run 直接从编译后的 classes 启动，不用 java -jar。
+
+4. 启动服务（4 个终端窗口，全部在 server-java/ 下）
+每个终端都先加载环境变量：set -a && source .env && set +a
+终端	命令	端口
+1	mvn -pl common install -DskipTests（仅首次）	—
+2	mvn -pl core-service spring-boot:run	8081
+3	mvn -pl admin-service spring-boot:run	8082
+4	mvn -pl im-connector spring-boot:run	8083
+5	mvn -pl gateway spring-boot:run	8080
+common 先 install 到本地 Maven 仓库，其余模块才能引用。一次性：先执行步骤 3 的 mvn clean install -DskipTests 即可。
+
+5. 验证全部健康
+for port in 8080 8081 8082 8083; do
+  echo "Port $port: $(curl -s http://localhost:$port/api/health)"
+done
+4 个都返回 {"code":0,"message":"ok","data":{"status":"healthy"}} 即启动成功。
+
+6. 前端编译
+cd "d:\学习资料\AI AGENT\项目\SHM\miniprogram"
+npm run dev:mp-weixin
+编译完成后 Ctrl+C 停掉 watch 模式。导入目录：miniprogram\dist\dev\mp-weixin
+
+7. 微信开发者工具设置
+导入目录选 D:\学习资料\AI AGENT\项目\SHM\miniprogram\dist\dev\mp-weixin
+AppID：wx0c4d54c24d540539
+详情 → 本地设置 → 勾选 "不校验合法域名"
+先模拟器验证首页能加载商品列表，再点真机调试

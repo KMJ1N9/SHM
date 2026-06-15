@@ -99,7 +99,7 @@
         <view v-if="evidenceImages.length > 0" class="evidence-block">
           <text class="desc-label">证据截图</text>
           <view class="evidence-grid">
-            <image
+            <SafeImage
               v-for="(url, i) in evidenceImages"
               :key="i"
               class="evidence-image"
@@ -148,6 +148,7 @@ import { ref, computed } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { getReportDetail } from '@/api/report';
 import { resolveImageUrl } from '@/api/index';
+import SafeImage from '@/components/SafeImage.vue';
 
 // ============================================================
 // 数据状态

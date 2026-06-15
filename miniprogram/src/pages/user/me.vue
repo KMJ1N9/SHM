@@ -3,11 +3,15 @@
     <!-- 用户信息 -->
     <view class="user-section">
       <view class="user-card">
-        <image
+        <SafeImage
+          v-if="avatarUrl"
           class="user-avatar"
-          :src="avatarUrl || defaultAvatar"
+          :src="avatarUrl"
           mode="aspectFill"
         />
+        <view v-else class="user-avatar user-avatar--default">
+          <text class="user-avatar-emoji">👤</text>
+        </view>
         <view class="user-info">
           <text class="user-name">{{ user?.nickname || '微信用户' }}</text>
           <text v-if="user?.class_name" class="user-class">{{ user.class_name }}</text>
@@ -124,6 +128,7 @@ import { ref, computed } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { useUserStore } from '@/store/user';
 import { resolveImageUrl } from '@/api/index';
+import SafeImage from '@/components/SafeImage.vue';
 import { unreadCount } from '@/api/notification';
 import { getCSContact, ensureAccount } from '@/api/im';
 import { isIMReady, reInitIM, cachePeerProfile } from '@/utils/im';
@@ -139,12 +144,6 @@ const user = computed(() => userStore.user);
  * resolveImageUrl 统一替换 localhost→当前 BASE_URL host。
  */
 const avatarUrl = computed(() => resolveImageUrl(user.value?.avatar));
-
-const defaultAvatar =
-  'data:image/svg+xml,' +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="50" fill="#F0F0F0"/></svg>'
-  );
 
 // ── 未读通知数 ──────────────────────────────────────────
 const unreadNum = ref(0);
@@ -318,6 +317,16 @@ function onLogout() {
   border: 4rpx solid rgba(255, 255, 255, 0.3);
   background: $color-divider;
   flex-shrink: 0;
+}
+
+.user-avatar--default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-avatar-emoji {
+  font-size: 56rpx;
 }
 
 .user-info {

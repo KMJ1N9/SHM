@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shm.admin.mapper.ProductMapper">
+
+    <!-- 管理端商品列表（含全部状态 + JOIN 卖家，与 Node.js adminService.listAllProducts 一致） -->
+    <select id="listAll" resultType="map">
+        SELECT p.id, p.seller_id, p.title, p.description, p.category, p.`condition`,
+               p.original_price, p.price, p.trade_location, p.negotiable, p.images, p.status,
+               p.created_at, p.updated_at,
+               u.nickname AS seller_nickname, u.avatar AS seller_avatar, u.credit_score AS seller_credit_score
+        FROM products p
+        JOIN users u ON p.seller_id = u.id
+        <where>
+            <if test="status != null and status != '' and status != 'all'">
+                AND p.status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND p.title LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+        ORDER BY p.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 管理端商品计数 -->
+    <select id="countAll" resultType="long">
+        SELECT COUNT(*) FROM products p
+        <where>
+            <if test="status != null and status != '' and status != 'all'">
+                AND p.status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND p.title LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+    </select>
+
+</mapper>

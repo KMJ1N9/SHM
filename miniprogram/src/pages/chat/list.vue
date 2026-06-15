@@ -29,11 +29,12 @@
       >
         <!-- 头像 -->
         <view class="conv-avatar-wrap">
-          <image
+          <SafeImage
             v-if="conv.avatar"
             class="conv-avatar"
-            :src="conv.avatar"
+            :src="resolveImageUrl(conv.avatar)"
             mode="aspectFill"
+            :lazy-load="true"
           />
           <view v-else class="conv-avatar conv-avatar--placeholder">
             <text class="conv-avatar-emoji">
@@ -99,6 +100,8 @@
 import { ref, onMounted } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import TIM from 'tim-wx-sdk';
+import { resolveImageUrl } from '@/api/index';
+import SafeImage from '@/components/SafeImage.vue';
 import {
   getTim,
   isIMReady,
@@ -404,15 +407,20 @@ onShow(() => {
   }
 }
 
-// 头像
+// 头像 — 尺寸定义在 wrapper 上（而非 SafeImage 组件本身），防止 SafeImage
+// 的 scoped CSS（.safe-image { width:100%; height:100% }，特异性 0,2,0）
+// 覆盖父级非 scoped 的 .conv-avatar { width:96rpx }（特异性 0,1,0），
+// 导致图片加载失败时元素塌陷为零尺寸。
 .conv-avatar-wrap {
+  width: 96rpx;
+  height: 96rpx;
   margin-right: 20rpx;
   flex-shrink: 0;
 }
 
 .conv-avatar {
-  width: 96rpx;
-  height: 96rpx;
+  width: 100%;
+  height: 100%;
   border-radius: $radius-full;
   background: $color-divider;
 

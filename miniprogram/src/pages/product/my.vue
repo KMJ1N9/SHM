@@ -24,10 +24,11 @@
         @click="goDetail(item.id)"
       >
         <!-- 封面图 -->
-        <image
+        <SafeImage
           class="item-cover"
           :src="getCoverImage(item.images)"
           mode="aspectFill"
+          :lazy-load="true"
         />
 
         <!-- 信息 -->
@@ -88,7 +89,9 @@
 import { ref } from 'vue';
 import { onShow, onReachBottom } from '@dcloudio/uni-app';
 import { my as myProducts, remove as deleteProduct } from '@/api/product';
+import { resolveImageUrl } from '@/api/index';
 import { useAppStore } from '@/store/app';
+import SafeImage from '@/components/SafeImage.vue';
 
 const appStore = useAppStore();
 
@@ -184,7 +187,9 @@ function getCoverImage(images) {
   if (typeof arr === 'string') {
     try { arr = JSON.parse(arr); } catch { return ''; }
   }
-  return Array.isArray(arr) && arr.length > 0 ? arr[0] : '';
+  const raw = Array.isArray(arr) && arr.length > 0 ? arr[0] : '';
+  // 真机 localhost 不可达，必须解析图片 URL
+  return resolveImageUrl(raw);
 }
 
 /**

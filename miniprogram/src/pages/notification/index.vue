@@ -115,7 +115,8 @@ const typeTabs = [
   { label: '全部', value: 'all' },
   { label: '订单', value: 'order_update' },
   { label: '评价', value: 'review_remind' },
-  { label: '举报', value: 'report_result' },
+  { label: '举报结果', value: 'report_result' },
+  { label: '新举报', value: 'report_new' },
   { label: '信誉', value: 'credit_change' },
 ];
 
@@ -280,6 +281,7 @@ function getTypeIcon(type) {
     order_update: '📦',
     review_remind: '⭐',
     report_result: '📋',
+    report_new: '🚩',
     credit_change: '🛡️',
   };
   return icons[type] || '📢';

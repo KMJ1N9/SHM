@@ -18,6 +18,16 @@ secret-message
 server/data/*
 !server/data/sensitive-words.txt
 
+# Spring Boot 环境配置（含密钥，不入库）
+server-java/.env
+server-java/**/application-dev.yml
+server-java/**/application-test.yml
+server-java/**/application-prod.yml
+
+# 一次性运维脚本（含本地路径/数据库备份，不入库）
+server/recover*.js
+server/recover*.sql
+
 # Claude
 .claude/skills/
 
@@ -34,6 +44,18 @@ Thumbs.db
 
 # 测试
 coverage/
+
+# 日志目录
+logs/
+
+# Java 构建产物
+server-java/**/target/
+
+# 用户上传图片（开发环境测试数据）
+server/public/images/user_*/
+
+# 异常文件
+miniprogram/null
 
 # 微信开发者工具
 *.wxss.map

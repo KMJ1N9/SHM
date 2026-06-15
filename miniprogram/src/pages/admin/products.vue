@@ -47,11 +47,12 @@
           @click="goDetail(product.id)"
         >
           <!-- 缩略图 -->
-          <image
+          <SafeImage
             v-if="product.cover_image"
             class="product-card-thumb"
-            :src="product.cover_image"
+            :src="resolveImageUrl(product.cover_image)"
             mode="aspectFill"
+            :lazy-load="true"
           />
           <view v-else class="product-card-thumb product-card-thumb--default">
             <text class="product-card-thumb-icon">📷</text>
@@ -118,7 +119,9 @@ import { ref } from 'vue';
 import { onShow, onUnload } from '@dcloudio/uni-app';
 import { useUserStore } from '@/store/user';
 import { getAdminProducts, offShelfProduct } from '@/api/admin';
+import { resolveImageUrl } from '@/api/index';
 import EmptyState from '@/components/EmptyState.vue';
+import SafeImage from '@/components/SafeImage.vue';
 
 const userStore = useUserStore();
 

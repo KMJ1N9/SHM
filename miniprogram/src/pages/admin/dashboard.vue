@@ -197,12 +197,21 @@ function getBarWidth(count, max) {
 
 function formatDateLabel(dateStr) {
   if (!dateStr) return '';
-  // dateStr 格式: "2024-12-01" 或 "2024-12-01T..."
-  const parts = dateStr.split('T')[0].split('-');
+  // 防御：如果后端返回数字时间戳（如 java.sql.Date 被 Jackson 序列化为毫秒数），
+  // 先转为日期字符串再格式化。
+  let str = dateStr;
+  if (typeof str === 'number') {
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return String(str);
+    str = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  if (typeof str !== 'string') return String(str);
+  // str 格式: "2024-12-01" 或 "2024-12-01T..."
+  const parts = str.split('T')[0].split('-');
   if (parts.length >= 3) {
     return `${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}`;
   }
-  return dateStr;
+  return str;
 }
 
 // ============================================================

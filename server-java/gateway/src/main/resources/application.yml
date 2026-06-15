@@ -1,0 +1,159 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
+    gateway:
+      enabled: true
+      # ── Netty HTTP Client 显式配置（排查空响应） ──
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+        pool:
+          type: elastic
+          max-idle-time: 60s
+        wiretap: true
+      routes:
+        # ── Auth 路由 → core-service ──
+        - id: core-auth
+          uri: lb://core-service
+          predicates:
+            - Path=/api/auth/**
+
+        # ── User 路由 → core-service ──
+        - id: core-users
+          uri: lb://core-service
+          predicates:
+            - Path=/api/users/**
+
+        # ── Product 路由 → core-service ──
+        - id: core-products
+          uri: lb://core-service
+          predicates:
+            - Path=/api/products/**
+
+        # ── Order 路由 → core-service ──
+        - id: core-orders
+          uri: lb://core-service
+          predicates:
+            - Path=/api/orders/**
+
+        # ── Review 路由 → core-service ──
+        - id: core-reviews
+          uri: lb://core-service
+          predicates:
+            - Path=/api/reviews/**
+
+        # ── Notification 路由 → core-service ──
+        - id: core-notifications
+          uri: lb://core-service
+          predicates:
+            - Path=/api/notifications/**
+
+        # ── Credit 路由 → core-service ──
+        - id: core-credit
+          uri: lb://core-service
+          predicates:
+            - Path=/api/credit/**
+
+        # ── Report 路由 → core-service（用户创建/查看自己的举报） ──
+        - id: core-reports
+          uri: lb://core-service
+          predicates:
+            - Path=/api/reports/**
+          filters:
+            - StripPrefix=0
+
+        # ── Admin 路由 → admin-service ──
+        - id: admin-routes
+          uri: lb://admin-service
+          predicates:
+            - Path=/api/admin/**
+
+        # ── Upload 路由 → im-connector ──
+        - id: im-upload
+          uri: lb://im-connector
+          predicates:
+            - Path=/api/upload/**
+
+        # ── IM 公共 API → core-service（前端 IM SDK 初始化入口） ──
+        - id: core-im
+          uri: lb://core-service
+          predicates:
+            - Path=/api/im/**
+
+        # ── IM 内部 API → im-connector（不对外暴露，由 Gateway 安全控制） ──
+        - id: im-internal
+          uri: lb://im-connector
+          predicates:
+            - Path=/internal/im/**
+
+        # ── 图片静态资源 → im-connector（开发环境服务端存储的图片） ──
+        - id: images-static
+          uri: lb://im-connector
+          predicates:
+            - Path=/images/**
+
+        # ── Health 路由 → core-service ──
+        - id: health
+          uri: lb://core-service
+          predicates:
+            - Path=/api/health
+
+# ── JWT 配置（仅 Access Token 验证，Refresh Token 由 core-service 处理） ──
+jwt:
+  access-secret: ${JWT_ACCESS_SECRET:}
+  refresh-secret: ${JWT_REFRESH_SECRET:}
+
+# ── 日志（DEBUG + 文件输出） ──
+logging:
+  file:
+    name: logs/gateway.log
+  level:
+    com.shm.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.cloud.loadbalancer: DEBUG
+    reactor.netty: DEBUG
+    reactor.netty.http.client: TRACE
+
+# ── LoadBalancer 缓存 ──
+spring.cloud.loadbalancer.cache.enabled: true
+spring.cloud.loadbalancer.cache.ttl: 35s
+
+# ── Sentinel 限流 (Phase 9) ──
+spring.cloud.sentinel:
+  transport:
+    dashboard: ${SENTINEL_DASHBOARD:localhost:8088}
+    port: 8720
+    client-ip: 127.0.0.1
+  eager: true
+  datasource:
+    # 核心流控规则（供 SentinelFlowFilter 使用 SphU API）
+    flow:
+      nacos:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        data-id: sentinel-flow-rules
+        group-id: DEFAULT_GROUP
+        data-type: json
+        rule-type: flow
+    # Gateway 流控规则（兼容保留，供 SentinelDashboard 可视化）
+    gw-flow:
+      nacos:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        data-id: sentinel-gateway-flow-rules
+        group-id: DEFAULT_GROUP
+        data-type: json
+        rule-type: gw-flow
+    gw-api-group:
+      nacos:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        data-id: sentinel-gateway-api-groups
+        group-id: DEFAULT_GROUP
+        data-type: json
+        rule-type: gw-api-group

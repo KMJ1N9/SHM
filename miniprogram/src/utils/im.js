@@ -385,8 +385,27 @@ export function cachePeerProfile(userId, nick, avatar = '') {
   if (!userId || !nick) return;
   const key = String(userId);
   const all = readPeerProfileCache();
-  // 不覆盖已有数据（可能来自更可靠的来源）
-  if (all[key] && all[key].nick) return;
+  const existing = all[key];
+
+  // 已有缓存：只在能补充缺失数据时才更新
+  if (existing && existing.nick) {
+    let changed = false;
+    // 补充缺失的头像（首次缓存可能来自 product.seller，当时无 avatar）
+    if (avatar && !existing.avatar) {
+      existing.avatar = avatar;
+      changed = true;
+    }
+    // 昵称以最近一次为准（后端 API > IM SDK auto-generated）
+    if (nick !== existing.nick) {
+      existing.nick = nick;
+      changed = true;
+    }
+    if (changed) {
+      writePeerProfileCache(all);
+    }
+    return;
+  }
+
   all[key] = { nick, avatar };
   writePeerProfileCache(all);
 }

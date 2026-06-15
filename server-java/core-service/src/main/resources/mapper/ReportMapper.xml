@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shm.core.mapper.ReportMapper">
+
+    <!--
+     举报列表（支持 reporter_id 过滤，与 Node.js reportRepo.list 行为一致）：
+     - reporterId 可选：传 null 查全部（管理端），传具体值查当前用户的举报
+     - 软删除过滤（deleted_at IS NULL）
+     - 动态条件：status / type
+    -->
+    <select id="listWithFilters" resultType="com.shm.common.model.entity.Report">
+        SELECT r.id, r.reporter_id, r.reported_user_id, r.product_id, r.order_id,
+               r.type, r.description, r.evidence_images, r.status, r.resolution,
+               r.deleted_at, r.created_at, r.updated_at, r.resolved_at
+        FROM reports r
+        WHERE r.deleted_at IS NULL
+        <if test="reporterId != null">
+            AND r.reporter_id = #{reporterId}
+        </if>
+        <if test="status != null and status != ''">
+            AND r.status = #{status}
+        </if>
+        <if test="type != null and type != ''">
+            AND r.type = #{type}
+        </if>
+        ORDER BY r.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countWithFilters" resultType="long">
+        SELECT COUNT(*)
+        FROM reports r
+        WHERE r.deleted_at IS NULL
+        <if test="reporterId != null">
+            AND r.reporter_id = #{reporterId}
+        </if>
+        <if test="status != null and status != ''">
+            AND r.status = #{status}
+        </if>
+        <if test="type != null and type != ''">
+            AND r.type = #{type}
+        </if>
+    </select>
+
+</mapper>

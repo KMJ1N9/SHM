@@ -13,13 +13,21 @@
  *   const data = await post('/auth/login', { code: 'xxx' });
  */
 
-// 后端 API 基础路径
-// 开发环境通过 env 或直接写死 localhost，生产环境替换为正式域名
-// 真机调试时需要改为 PC 的局域网 IP（如 http://10.96.197.124:3000/api）
-// 在开发者工具模拟器中调试时改回 http://localhost:3000/api
-const BASE_URL = 'http://10.115.248.247:3000/api';
+// ── 后端 API 基础路径 ──────────────────────────────────────────
+//
+// 开发者工具模拟器：使用 localhost（模拟器和后端在同一台 PC 上）
+// 真机调试：改为 PC 当前局域网 IP（手机和 PC 需在同一网络）
+//   查看 PC 当前 IP：终端运行 ipconfig | grep "10\." | grep IPv4
+//   当前校园网 IP：http://10.96.197.124:8080/api
+//   手机热点时 IP：http://10.115.248.247:8080/api
+//
+// 切换方式：注释/取消注释下面两行之一即可
+// ────────────────────────────────────────────────────────────────
+// const BASE_URL = 'http://localhost:8080/api';               // ← Java 后端 (Gateway)
+// const BASE_URL = 'http://10.96.197.124:8080/api';        // ← 校园网真机
+const BASE_URL = 'http://10.115.248.247:8080/api';       // ← 手机热点真机
 
-/** 图片服务器 origin（http://<host>:3000），从 BASE_URL 派生 */
+/** 图片服务器 origin，从 BASE_URL 派生 */
 const IMAGE_ORIGIN = BASE_URL.replace(/\/api$/, '');
 
 /**
@@ -35,7 +43,19 @@ const IMAGE_ORIGIN = BASE_URL.replace(/\/api$/, '');
 function resolveImageUrl(url) {
   if (!url) return '';
   // 替换 hardcoded localhost:3000 → 当前服务器 origin（适配模拟器/真机/IP 变更）
-  return url.replace(/^http:\/\/localhost:3000/, IMAGE_ORIGIN);
+  let resolved = url.replace(/^http:\/\/localhost:3000/, IMAGE_ORIGIN);
+  // 处理图片上传时 BASE_URL 的 IP 与当前 BASE_URL 的 IP 不同的情况。
+  // 开发环境下图片 URL 格式为 http://<ip>:3000/images/...，
+  // 当开发者 PC 的局域网 IP 变更后，数据库中已存的旧 IP URL 需要替换为当前 IP。
+  // COS 正式上传返回的是 https://<域名> URL，不会被此正则匹配。
+  const ipMatch = resolved.match(/^http:\/\/(\d+\.\d+\.\d+\.\d+):3000/);
+  if (ipMatch) {
+    const matchedOrigin = ipMatch[0];
+    if (matchedOrigin !== IMAGE_ORIGIN) {
+      resolved = resolved.replace(matchedOrigin, IMAGE_ORIGIN);
+    }
+  }
+  return resolved;
 }
 
 /** 刷新中标记——避免并发请求同时刷新 Token */

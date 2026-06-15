@@ -1,0 +1,3 @@
+cd "D:\学习资料\AI AGENT\项目\SHM\server-java\tools"
+
+java -Dserver.port=8088 -jar sentinel-dashboard-1.8.6.jar

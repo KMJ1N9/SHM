@@ -30,6 +30,18 @@ const userController = {
   },
 
   /**
+   * GET /api/users/admin/contact — 获取管理员联系方式
+   */
+  async getAdminContact(req, res, next) {
+    try {
+      const admin = await userService.getAdminContact();
+      res.json({ code: 0, message: 'ok', data: admin });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  /**
    * PUT /api/users/me — 编辑个人资料
    */
   async updateProfile(req, res, next) {

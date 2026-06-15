@@ -54,11 +54,12 @@
       >
         <view v-for="user in users" :key="user.id" class="user-card">
           <!-- 头像 -->
-          <image
+          <SafeImage
             v-if="user.avatar"
             class="user-card-avatar"
-            :src="user.avatar"
+            :src="resolveImageUrl(user.avatar)"
             mode="aspectFill"
+            :lazy-load="true"
           />
           <view v-else class="user-card-avatar user-card-avatar--default">
             <text class="user-card-avatar-text">👤</text>
@@ -134,7 +135,9 @@ import { ref } from 'vue';
 import { onShow, onUnload } from '@dcloudio/uni-app';
 import { useUserStore } from '@/store/user';
 import { getUserList, banUser, unbanUser } from '@/api/admin';
+import { resolveImageUrl } from '@/api/index';
 import EmptyState from '@/components/EmptyState.vue';
+import SafeImage from '@/components/SafeImage.vue';
 
 const userStore = useUserStore();
 

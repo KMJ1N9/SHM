@@ -16,10 +16,10 @@
     <template v-else-if="profile">
       <!-- 用户头部 -->
       <view class="profile-header">
-        <image
+        <SafeImage
           v-if="profile.avatar"
           class="profile-avatar"
-          :src="profile.avatar"
+          :src="resolveImageUrl(profile.avatar)"
           mode="aspectFill"
         />
         <view v-else class="profile-avatar profile-avatar--default">
@@ -67,10 +67,10 @@
             class="review-item"
           >
             <view class="review-item-header">
-              <image
+              <SafeImage
                 v-if="rv.reviewer_avatar"
                 class="review-item-avatar"
-                :src="rv.reviewer_avatar"
+                :src="resolveImageUrl(rv.reviewer_avatar)"
                 mode="aspectFill"
               />
               <view v-else class="review-item-avatar review-item-avatar--default">
@@ -118,9 +118,11 @@
 import { ref } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { getPublicProfile } from '@/api/user';
+import { resolveImageUrl } from '@/api/index';
 import { getUserCredit } from '@/api/credit';
 import { getUserReviews } from '@/api/review';
 import StarRating from '@/components/StarRating.vue';
+import SafeImage from '@/components/SafeImage.vue';
 
 const profile = ref(null);
 const creditScore = ref(0);

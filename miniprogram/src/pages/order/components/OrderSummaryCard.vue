@@ -25,7 +25,7 @@
     <view class="section-card">
       <text class="section-title">交易对象</text>
       <view class="partner-row">
-        <image
+        <SafeImage
           v-if="partnerAvatar"
           class="partner-avatar"
           :src="partnerAvatar"
@@ -99,7 +99,11 @@ function parseSnapshot() {
 
 const productImage = computed(() => {
   const s = parseSnapshot();
-  const images = s.images;
+  let images = s.images;
+  // 兼容后端 bug：images 可能被二次序列化为 JSON string 而非数组
+  if (typeof images === 'string') {
+    try { images = JSON.parse(images); } catch { images = []; }
+  }
   return Array.isArray(images) && images.length > 0 ? images[0] : '';
 });
 const productTitle = computed(() => parseSnapshot().title || '商品');
@@ -114,8 +118,8 @@ const partnerName = computed(() => {
 });
 const partnerAvatar = computed(() => {
   if (!props.order) return '';
-  if (props.isBuyer) return props.order.seller_avatar || '';
-  return props.order.buyer_avatar || '';
+  const raw = props.isBuyer ? (props.order.seller_avatar || '') : (props.order.buyer_avatar || '');
+  return resolveImageUrl(raw);
 });
 
 function goProduct() {

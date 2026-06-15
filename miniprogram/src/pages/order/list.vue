@@ -257,7 +257,11 @@ function goDetail(orderId) {
 // 辅助函数——从 product_snapshot JSON 提取信息
 // ============================================================
 function getProductImage(order) {
-  const images = order._snapshot?.images;
+  let images = order._snapshot?.images;
+  // 兼容后端 bug：images 可能被二次序列化为 JSON string 而非数组
+  if (typeof images === 'string') {
+    try { images = JSON.parse(images); } catch { images = []; }
+  }
   if (Array.isArray(images) && images.length > 0) return images[0];
   return '';
 }

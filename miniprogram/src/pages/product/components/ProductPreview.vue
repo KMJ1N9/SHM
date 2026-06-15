@@ -4,11 +4,11 @@
 
     <!-- 图片预览 -->
     <view v-if="form.images && form.images.length > 0" class="preview-images">
-      <image
+      <SafeImage
         v-for="(url, i) in form.images"
         :key="i"
         class="preview-image"
-        :src="url"
+        :src="resolveImageUrl(url)"
         mode="aspectFill"
         @click="previewImages(i)"
       />
@@ -55,6 +55,9 @@
 </template>
 
 <script setup>
+import { resolveImageUrl } from '@/api/index';
+import SafeImage from '@/components/SafeImage.vue';
+
 const props = defineProps({
   form: { type: Object, required: true },
 });
@@ -75,9 +78,10 @@ function getCategoryLabel(value) {
 
 function previewImages(index) {
   if (props.form.images && props.form.images.length > 0) {
+    const urls = props.form.images.map((u) => resolveImageUrl(u) || u);
     uni.previewImage({
-      current: props.form.images[index],
-      urls: props.form.images,
+      current: urls[index],
+      urls,
     });
   }
 }

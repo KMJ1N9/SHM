@@ -132,7 +132,7 @@ function resetForm() {
 onLoad((options) => {
   if (options && options.id) {
     editId.value = parseInt(options.id, 10);
-    uni.setNavigationBarTitle({ title: '编辑商品' });
+      uni.setNavigationBarTitle({ title: '编辑商品' });
     loadExistingProduct(editId.value);
   }
 });
@@ -140,13 +140,13 @@ onLoad((options) => {
 onShow(() => {
   const pendingId = appStore.consumePendingEditProductId();
   if (pendingId !== null && pendingId !== undefined) {
-    resetForm();
+      resetForm();
     editId.value = pendingId;
-    uni.setNavigationBarTitle({ title: '编辑商品' });
+      uni.setNavigationBarTitle({ title: '编辑商品' });
     loadExistingProduct(pendingId);
   } else if (editId.value) {
-    resetForm();
-    uni.setNavigationBarTitle({ title: '发布商品' });
+      resetForm();
+      uni.setNavigationBarTitle({ title: '发布商品' });
   }
 });
 
@@ -281,10 +281,11 @@ async function submitPublish() {
     }
 
     setTimeout(() => {
-      if (isEditMode.value) {
-        const targetId = editId.value;
-        resetForm();
-        uni.setNavigationBarTitle({ title: '发布商品' });
+      const wasEdit = isEditMode.value;
+      const targetId = editId.value;
+      resetForm();
+      uni.setNavigationBarTitle({ title: '发布商品' });
+      if (wasEdit) {
         uni.navigateTo({ url: `/pages/product/detail?id=${targetId}` });
       } else {
         uni.switchTab({ url: '/pages/index/index' });

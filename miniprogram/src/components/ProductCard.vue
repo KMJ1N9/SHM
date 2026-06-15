@@ -69,14 +69,13 @@ const props = defineProps({
 const emit = defineEmits(['click']);
 
 /**
- * 缺省占位图：灰色 SVG 矩形，与 card-image-wrap 的 $color-divider 背景一致
- * 当 product.cover_image 为 null/undefined 时显示，避免渲染破损图片图标
+ * 缺省占位图：使用空字符串，让 CSS 背景色透出（$color-divider）
+ *
+ * 注意：不能用 data:image/svg+xml — 微信小程序真机不支持 SVG Data URI。
+ * card-image-wrap 已有 background: $color-divider，空 src 时 SafeImage
+ * 设置 displaySrc 为 placeholder（空），image 组件透明，CSS 背景自然显示。
  */
-const placeholderImage =
-  'data:image/svg+xml,' +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#F0F0F0" width="200" height="200"/></svg>'
-  );
+const placeholderImage = '';
 
 /**
  * 格式化价格（保留最多 2 位小数，去掉多余的 0）

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shm.core.mapper.UserMapper">
+
+    <!--
+     动态更新用户资料：只 SET 实际传入的非 null 字段，
+     避免未传字段被覆盖为 NULL（与 Node.js 的 filtered 对象 + 动态 SQL 行为一致）。
+    -->
+    <update id="updateProfile">
+        UPDATE users
+        <set>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="avatar != null">avatar = #{avatar},</if>
+            <if test="className != null">class_name = #{className},</if>
+            <if test="dormBuilding != null">dorm_building = #{dormBuilding},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+</mapper>

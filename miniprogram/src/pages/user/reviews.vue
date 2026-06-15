@@ -81,11 +81,12 @@
           class="review-card"
         >
           <view class="review-header">
-            <image
+            <SafeImage
               v-if="item.reviewer_avatar"
               class="review-avatar"
-              :src="item.reviewer_avatar"
+              :src="resolveImageUrl(item.reviewer_avatar)"
               mode="aspectFill"
+              :lazy-load="true"
             />
             <view v-else class="review-avatar review-avatar--default">
               <text class="review-avatar-emoji">
@@ -183,7 +184,9 @@ import { ref, onMounted } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { getUserReviews } from '@/api/review';
 import { useUserStore } from '@/store/user';
+import { resolveImageUrl } from '@/api/index';
 import StarRating from '@/components/StarRating.vue';
+import SafeImage from '@/components/SafeImage.vue';
 
 // ============================================================
 // 数据状态

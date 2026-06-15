@@ -210,9 +210,13 @@ function uploadToServer(file, token) {
             const body = JSON.parse(res.data);
             if (body.code === 0 && body.data && body.data.url) {
               // 服务端返回相对路径（如 /images/user_6/xxx.jpg），
-              // 拼接为完整 HTTP URL（小程序 <image> 需要完整 URL）
-              const origin = BASE_URL.replace(/\/api$/, '');
-              resolve(origin + body.data.url);
+              // 拼接为完整 HTTP URL（小程序 <image> 需要完整 URL）。
+              //
+              // ⚠️ 始终使用 http://localhost:3000 作为前缀存入数据库，
+              // 而非 BASE_URL 的当前 host。resolveImageUrl() 会在显示时
+              // 自动将 localhost:3000 替换为当前可达的服务器地址。
+              // 这样可以避免 IP 变更后数据库中旧图片 URL 无法访问的问题。
+              resolve('http://localhost:3000' + body.data.url);
             } else {
               reject(new Error(body.message || '上传失败'));
             }

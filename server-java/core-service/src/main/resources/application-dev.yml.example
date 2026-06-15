@@ -1,0 +1,25 @@
+# ============================================================
+# 本地开发环境配置模板
+# 使用方法：复制为 application-dev.yml 并填入实际值
+# ============================================================
+
+# 此文件是模板，入库。application-dev.yml 不入库（已在 .gitignore 中）。
+# 启动命令：mvn -pl core-service spring-boot:run -Dspring.profiles.active=dev
+
+DB_URL: jdbc:mysql://127.0.0.1:3306/campus_market_dev?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8mb4
+DB_USERNAME: your_dev_username
+DB_PASSWORD: your_dev_password
+
+# JWT 密钥（至少 32 字符）
+JWT_ACCESS_SECRET: your-access-secret-at-least-32-chars
+JWT_REFRESH_SECRET: your-refresh-secret-at-least-32-chars
+
+# 微信小程序
+WX_APP_ID: your_wechat_appid
+WX_APP_SECRET: your_wechat_app_secret
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2

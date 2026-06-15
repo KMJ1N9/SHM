@@ -26,6 +26,14 @@ export function getCSContact() {
 }
 
 /**
+ * 获取管理员联系方式（ID + 昵称 + 头像）
+ * @returns {Promise<{id: number, nickname: string, avatar: string}>}
+ */
+export function getAdminContact() {
+  return get('/users/admin/contact');
+}
+
+/**
  * 确保指定用户的 IM 账号已导入
  *
  * 腾讯云 IM 发送消息前要求接收方 UserID 已存在于 IM 系统中。

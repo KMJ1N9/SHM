@@ -144,6 +144,17 @@ const userRepo = {
   },
 
   /**
+   * 查找管理员用户（取第一个 active 状态的 admin 角色用户）
+   * @returns {Promise<Object|null>}
+   */
+  async findAdminUser() {
+    const [row] = await query(
+      `SELECT id, nickname, avatar FROM users WHERE role = 'admin' AND status = 'active' LIMIT 1`
+    );
+    return row || null;
+  },
+
+  /**
    * 管理后台：用户列表（支持搜索/筛选/分页）
    * @param {Object} filters - { keyword?, status?, role?, page, pageSize }
    * @returns {Promise<{list: Array, total: number}>}

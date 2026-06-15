@@ -70,7 +70,6 @@
         :seller="product.seller"
         :is-owner="isOwner"
         :product-id="product.id"
-        :default-avatar="defaultAvatar"
       />
     </template>
 
@@ -124,13 +123,6 @@ const loading = ref(true);
 const errorMsg = ref('');
 const product = ref(null);
 const currentId = ref(0);
-
-/** 缺省头像 — 灰色圆形 SVG data URI */
-const defaultAvatar =
-  'data:image/svg+xml,' +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="50" fill="#F0F0F0"/></svg>'
-  );
 
 const isOwner = ref(false);
 const submitting = ref(false);

@@ -1,0 +1,9 @@
+# 测试环境 bootstrap 配置 — 覆盖生产 bootstrap.yml
+# 禁用 Nacos 配置中心（集成测试不需要 Nacos）
+spring:
+  cloud:
+    nacos:
+      config:
+        enabled: false
+        import-check:
+          enabled: false

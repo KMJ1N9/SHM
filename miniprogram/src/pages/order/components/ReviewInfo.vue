@@ -22,10 +22,10 @@
     <!-- 已有评价列表 -->
     <view v-for="rv in reviews" :key="rv.id" class="review-item">
       <view class="review-item-header">
-        <image
+        <SafeImage
           v-if="rv.reviewer_avatar"
           class="review-item-avatar"
-          :src="rv.reviewer_avatar"
+          :src="resolveImageUrl(rv.reviewer_avatar)"
           mode="aspectFill"
         />
         <view v-else class="review-item-avatar review-item-avatar--default">
@@ -57,7 +57,9 @@
 
 <script setup>
 import { formatDateTime } from '@/utils/format';
+import { resolveImageUrl } from '@/api/index';
 import StarRating from '@/components/StarRating.vue';
+import SafeImage from '@/components/SafeImage.vue';
 
 defineProps({
   reviews: { type: Array, default: () => [] },

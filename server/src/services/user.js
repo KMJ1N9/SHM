@@ -42,6 +42,18 @@ const userService = {
   },
 
   /**
+   * 获取管理员联系方式（IM 聊天用）
+   * @returns {Promise<{id: number, nickname: string, avatar: string}>}
+   */
+  async getAdminContact() {
+    const admin = await userRepo.findAdminUser();
+    if (!admin) {
+      throw notFound('管理员');
+    }
+    return { id: admin.id, nickname: admin.nickname, avatar: admin.avatar || '' };
+  },
+
+  /**
    * 编辑个人资料
    * @param {number} userId
    * @param {Object} updates - { nickname?, avatar?, class_name?, dorm_building? }

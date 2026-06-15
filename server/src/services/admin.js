@@ -166,11 +166,38 @@ const adminService = {
 
   /**
    * 管理端商品列表（含全部状态：active/reserved/sold/off_shelf/deleted）。
+   *
+   * 与 productService.list() 保持一致的响应格式：
+   *   - cover_image：从 images JSON 数组提取第一张作为封面
+   *   - seller：嵌套对象 { id, nickname, avatar, credit_score }
+   *
    * @param {Object} filters
    * @returns {Promise<{list: Array, total: number, page: number, pageSize: number}>}
    */
   async listAllProducts(filters) {
-    return productRepo.listAll(filters);
+    const result = await productRepo.listAll(filters);
+    // 构造封面图 URL（从 images JSON 数组提取第一张）。
+    // mysql2 将 JSON 列解析为对象，但部分旧数据可能仍为字符串。
+    const extractCoverImage = (images) => {
+      if (!images) return null;
+      let arr = images;
+      if (typeof arr === 'string') {
+        try { arr = JSON.parse(arr); } catch { return null; }
+      }
+      return Array.isArray(arr) && arr.length > 0 ? arr[0] : null;
+    };
+    // 将扁平 seller_* 字段嵌套为 seller 对象，与 productService.list() 保持一致
+    result.list = result.list.map((row) => ({
+      ...row,
+      cover_image: extractCoverImage(row.images),
+      seller: {
+        id: row.seller_id,
+        nickname: row.seller_nickname,
+        avatar: row.seller_avatar,
+        credit_score: row.seller_credit_score,
+      },
+    }));
+    return result;
   },
 
   /**

@@ -1,0 +1,15 @@
+# Nacos 配置中心（bootstrap.yml 先于 application.yml 加载）
+# 敏感配置（JWT 密钥 / 微信凭证 / DB 密码）写入 Nacos 后可从此处删除环境变量引用
+spring:
+  cloud:
+    nacos:
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        file-extension: yaml
+        # 配置分组（默认 DEFAULT_GROUP）
+        group: DEFAULT_GROUP
+        # 共享配置（所有服务公用）
+        shared-configs:
+          - data-id: shm-common.yaml
+            group: DEFAULT_GROUP
+            refresh: true

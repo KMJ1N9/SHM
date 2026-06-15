@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shm.core.mapper.ProductMapper">
+
+    <!--
+     复杂搜索查询：
+     - keyword → FULLTEXT MATCH AGAINST (ngram 中文分词)
+     - category / condition → 精确过滤
+     - priceMin / priceMax → 价格区间
+     - sort → created_at DESC (最新) / price ASC (价格低→高) / price DESC (价格高→低)
+
+     参数通过 ProductSearchQuery DTO 传递，在 XML 中通过 query.xxx 引用嵌套属性。
+    -->
+    <select id="listWithFilters" resultType="com.shm.common.model.entity.Product">
+        SELECT DISTINCT p.id, p.seller_id, p.title, p.description, p.category, p.`condition`,
+               p.original_price, p.price, p.trade_location, p.negotiable, p.images,
+               p.status, p.created_at, p.updated_at
+        FROM products p
+        LEFT JOIN users u ON p.seller_id = u.id
+        WHERE p.status = 'active'
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (MATCH(p.title, p.description) AGAINST(#{query.keyword} IN BOOLEAN MODE)
+                 OR u.nickname LIKE CONCAT('%', #{query.keyword}, '%'))
+        </if>
+        <if test="query.category != null and query.category != ''">
+            AND p.category = #{query.category}
+        </if>
+        <if test="query.condition != null and query.condition != ''">
+            AND p.`condition` = #{query.condition}
+        </if>
+        <if test="query.priceMin != null">
+            AND p.price >= #{query.priceMin}
+        </if>
+        <if test="query.priceMax != null">
+            AND p.price &lt;= #{query.priceMax}
+        </if>
+        <choose>
+            <when test="query.sort == 'price_asc'">ORDER BY p.price ASC</when>
+            <when test="query.sort == 'price_desc'">ORDER BY p.price DESC</when>
+            <otherwise>ORDER BY p.created_at DESC</otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countWithFilters" resultType="long">
+        SELECT COUNT(DISTINCT p.id)
+        FROM products p
+        LEFT JOIN users u ON p.seller_id = u.id
+        WHERE p.status = 'active'
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (MATCH(p.title, p.description) AGAINST(#{query.keyword} IN BOOLEAN MODE)
+                 OR u.nickname LIKE CONCAT('%', #{query.keyword}, '%'))
+        </if>
+        <if test="query.category != null and query.category != ''">
+            AND p.category = #{query.category}
+        </if>
+        <if test="query.condition != null and query.condition != ''">
+            AND p.`condition` = #{query.condition}
+        </if>
+        <if test="query.priceMin != null">
+            AND p.price >= #{query.priceMin}
+        </if>
+        <if test="query.priceMax != null">
+            AND p.price &lt;= #{query.priceMax}
+        </if>
+    </select>
+
+</mapper>

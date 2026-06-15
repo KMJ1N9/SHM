@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shm.admin.mapper.ReportMapper">
+
+    <!-- 工单列表（与 Node.js reportRepo.list 一致：JOIN 用户表 + 动态过滤 + 分页） -->
+    <select id="listWithFilters" resultType="map">
+        SELECT r.id, r.reporter_id, r.reported_user_id, r.product_id, r.order_id,
+               r.type, r.description, r.evidence_images, r.status,
+               r.resolution, r.deleted_at, r.resolved_at, r.created_at, r.updated_at,
+               reporter.nickname AS reporter_nickname, reporter.avatar AS reporter_avatar,
+               reported.nickname AS reported_nickname, reported.avatar AS reported_avatar
+        FROM reports r
+        JOIN users reporter ON r.reporter_id = reporter.id
+        JOIN users reported ON r.reported_user_id = reported.id
+        <where>
+            r.deleted_at IS NULL
+            <if test="status != null and status != '' and status != 'all'">
+                AND r.status = #{status}
+            </if>
+            <if test="type != null and type != '' and type != 'all'">
+                AND r.type = #{type}
+            </if>
+        </where>
+        ORDER BY r.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 工单计数 -->
+    <select id="countWithFilters" resultType="long">
+        SELECT COUNT(*) FROM reports r
+        <where>
+            r.deleted_at IS NULL
+            <if test="status != null and status != '' and status != 'all'">
+                AND r.status = #{status}
+            </if>
+            <if test="type != null and type != '' and type != 'all'">
+                AND r.type = #{type}
+            </if>
+        </where>
+    </select>
+
+</mapper>
