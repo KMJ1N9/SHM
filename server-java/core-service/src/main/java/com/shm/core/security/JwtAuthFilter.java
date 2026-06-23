@@ -67,6 +67,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        // 1b. Swagger UI + API docs 放行（Phase 12）
+        String uri = request.getRequestURI();
+        if (uri.startsWith("/v3/api-docs") || uri.startsWith("/swagger-ui")
+                || uri.startsWith("/webjars")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         // 2. 白名单放行
         if (isWhitelisted(request)) {
             chain.doFilter(request, response);
