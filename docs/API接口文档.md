@@ -1,9 +1,9 @@
 # API 接口文档：校园二手交易小程序
 
-**版本：** v1.0
+**版本：** v2.0
 **基准域名：** `https://api.campus-market.example.com/api`
-**最后更新：** 2026-06-04
-**上游来源：** [技术架构文档 §五](技术架构文档.md)
+**最后更新：** 2026-06-23
+**上游来源：** [技术架构文档 §五](技术架构文档.md) | **双后端兼容：** Node.js (端口 3000) · Java (端口 8080)，API 契约完全一致
 
 ---
 
@@ -11,7 +11,7 @@
 
 | 约定 | 说明 |
 |------|------|
-| Base URL | `https://api.campus-market.example.com/api` |
+| Base URL | `https://api.campus-market.example.com/api`。**双后端切换：** Node.js 开发环境 `http://localhost:3000/api` · Java (Gateway) 开发环境 `http://localhost:8080/api`。所有 43 个端点路径和响应格式完全一致 |
 | 鉴权 | Header `Authorization: Bearer <JWT>`（除登录/注册、健康检查外均需携带） |
 | 成功响应 | `{ code: 0, data: {...}, message: "ok" }` |
 | 错误响应 | `{ code: <错误码>, message: "<人类可读描述>", detail?: <调试信息> }`。`detail` 仅在 development 环境返回，production 环境置 `null` |

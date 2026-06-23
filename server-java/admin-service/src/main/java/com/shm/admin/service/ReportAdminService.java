@@ -2,6 +2,7 @@ package com.shm.admin.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shm.admin.feign.CoreUserFeign;
 import com.shm.admin.feign.ImConnectorFeign;
 import com.shm.admin.mapper.AdminLogMapper;
 import com.shm.admin.mapper.NotificationMapper;
@@ -9,10 +10,12 @@ import com.shm.admin.mapper.ReportMapper;
 import com.shm.admin.mapper.UserMapper;
 import com.shm.common.exception.BusinessException;
 import com.shm.common.exception.ErrorCode;
+import com.shm.common.model.dto.internal.PenaltyRequest;
 import com.shm.common.model.entity.AdminLog;
 import com.shm.common.model.entity.Notification;
 import com.shm.common.model.entity.Report;
 import com.shm.common.model.entity.User;
+import io.seata.spring.annotation.GlobalTransactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,17 +46,19 @@ public class ReportAdminService {
     private final AdminLogMapper adminLogMapper;
     private final ObjectMapper objectMapper;
     private final ImConnectorFeign imConnectorFeign;
+    private final CoreUserFeign coreUserFeign;
 
     public ReportAdminService(ReportMapper reportMapper, UserMapper userMapper,
                                NotificationMapper notificationMapper,
                                AdminLogMapper adminLogMapper, ObjectMapper objectMapper,
-                               ImConnectorFeign imConnectorFeign) {
+                               ImConnectorFeign imConnectorFeign, CoreUserFeign coreUserFeign) {
         this.reportMapper = reportMapper;
         this.userMapper = userMapper;
         this.notificationMapper = notificationMapper;
         this.adminLogMapper = adminLogMapper;
         this.objectMapper = objectMapper;
         this.imConnectorFeign = imConnectorFeign;
+        this.coreUserFeign = coreUserFeign;
     }
 
     /**
@@ -108,8 +113,15 @@ public class ReportAdminService {
      *
      * <p>事务内原子操作：工单裁决 + 处罚执行 + 通知双方 + 管理员日志。
      *
+     * <h3>Phase 13 — Seata 全局事务</h3>
+     * <p>{@code @GlobalTransactional} 将本方法注册为 Seata 全局事务入口。
+     * admin-service 本地写操作（工单/通知/日志）为分支 1，
+     * Feign 调用 core-service 执行用户处罚为分支 2。
+     * 任一分支失败 → Seata TC 协调两阶段回滚。
+     *
      * @param penalty "none"（仅说明）/ "deduct_credit"（扣减信誉分）/ "ban"（封禁用户）
      */
+    @GlobalTransactional(timeoutMills = 300000, name = "resolve-ticket")
     @Transactional
     public Map<String, Object> resolveTicket(Long ticketId, Long adminId, String resolution,
                                               String penalty, int deductCredit) {
@@ -128,64 +140,71 @@ public class ReportAdminService {
         String reportedContent;
         String reporterContent; // 举报人收到的通知内容
 
-        if ("ban".equals(penalty)) {
-            // 封禁用户（更新 status + token_version+1 使已有 JWT 失效）
-            userMapper.updateStatus(ticket.getReportedUserId(), "banned");
+        if ("ban".equals(penalty) || deductCredit > 0) {
+            // Phase 13 — Seata 跨服务事务分支：Feign 调用 core-service 执行用户处罚
+            PenaltyRequest penaltyReq = new PenaltyRequest(penalty, deductCredit, resolution, ticketId);
+            Map<String, Object> penaltyResult = coreUserFeign.applyPenalty(ticket.getReportedUserId(), penaltyReq);
 
-            reportedContent = "你的账号已被封禁，原因：" + resolution;
-            reporterContent = "你举报的用户已被封禁";
-
-            // 信誉分变动通知：封禁同时记录扣分
-            Map<String, Object> banMetadataMap = new LinkedHashMap<>();
-            banMetadataMap.put("reason", resolution);
-            banMetadataMap.put("action", "ban");
-            banMetadataMap.put("ref_id", ticketId);
-            String banMetadata = toJson(banMetadataMap);
-
-            Notification banNotification = Notification.builder()
-                    .userId(ticket.getReportedUserId())
-                    .type("ban")
-                    .title("账号封禁")
-                    .content(reportedContent)
-                    .isRead(false)
-                    .metadata(banMetadata)
-                    .build();
-            notificationMapper.insert(banNotification);
-
-        } else if (deductCredit > 0) {
-            // 扣减信誉分（原子读-改-写，FOR UPDATE 防并发）
-            User reported = userMapper.findByIdForUpdate(ticket.getReportedUserId());
-            if (reported == null) {
-                throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+            int currentScore = 0;
+            int previousScore = 0;
+            if (penaltyResult != null) {
+                int resultCode = ((Number) penaltyResult.getOrDefault("code", -1)).intValue();
+                if (resultCode != 0) {
+                    throw new BusinessException(ErrorCode.INTERNAL_ERROR,
+                            "跨服务处罚失败: " + penaltyResult.get("message"));
+                }
+                if (penaltyResult.containsKey("data")) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> data = (Map<String, Object>) penaltyResult.get("data");
+                    if (data != null) {
+                        previousScore = ((Number) data.getOrDefault("previousScore", 0)).intValue();
+                        currentScore = ((Number) data.getOrDefault("currentScore", 0)).intValue();
+                    }
+                }
             }
 
-            int previousScore = reported.getCreditScore();
-            userMapper.updateCreditScore(ticket.getReportedUserId(), -deductCredit, creditMax);
+            if ("ban".equals(penalty)) {
+                reportedContent = "你的账号已被封禁，原因：" + resolution;
+                reporterContent = "你举报的用户已被封禁";
 
-            User updated = userMapper.findById(ticket.getReportedUserId());
-            int currentScore = updated != null ? updated.getCreditScore() : Math.max(0, previousScore - deductCredit);
+                Map<String, Object> banMetadataMap = new LinkedHashMap<>();
+                banMetadataMap.put("reason", resolution);
+                banMetadataMap.put("action", "ban");
+                banMetadataMap.put("ref_id", ticketId);
+                banMetadataMap.put("previous_score", previousScore);
+                String banMetadata = toJson(banMetadataMap);
 
-            reportedContent = "你的信誉分变更为：" + currentScore + "（-" + deductCredit + " 举报成立）";
-            reporterContent = "你举报的用户已被处理，信誉分-" + deductCredit;
+                Notification banNotification = Notification.builder()
+                        .userId(ticket.getReportedUserId())
+                        .type("ban")
+                        .title("账号封禁")
+                        .content(reportedContent)
+                        .isRead(false)
+                        .metadata(banMetadata)
+                        .build();
+                notificationMapper.insert(banNotification);
+            } else {
+                reportedContent = "你的信誉分变更为：" + currentScore + "（-" + deductCredit + " 举报成立）";
+                reporterContent = "你举报的用户已被处理，信誉分-" + deductCredit;
 
-            Map<String, Object> metadataMap = new LinkedHashMap<>();
-            metadataMap.put("delta", -deductCredit);
-            metadataMap.put("reason", "举报成立");
-            metadataMap.put("previous_score", previousScore);
-            metadataMap.put("current_score", currentScore);
-            metadataMap.put("ref_id", ticketId);
-            String metadata = toJson(metadataMap);
+                Map<String, Object> metadataMap = new LinkedHashMap<>();
+                metadataMap.put("delta", -deductCredit);
+                metadataMap.put("reason", "举报成立");
+                metadataMap.put("previous_score", previousScore);
+                metadataMap.put("current_score", currentScore);
+                metadataMap.put("ref_id", ticketId);
+                String metadata = toJson(metadataMap);
 
-            Notification notification = Notification.builder()
-                    .userId(ticket.getReportedUserId())
-                    .type("credit_change")
-                    .title("信誉分变动")
-                    .content(reportedContent)
-                    .isRead(false)
-                    .metadata(metadata)
-                    .build();
-            notificationMapper.insert(notification);
-
+                Notification notification = Notification.builder()
+                        .userId(ticket.getReportedUserId())
+                        .type("credit_change")
+                        .title("信誉分变动")
+                        .content(reportedContent)
+                        .isRead(false)
+                        .metadata(metadata)
+                        .build();
+                notificationMapper.insert(notification);
+            }
         } else {
             // penalty=none：仅裁决说明，不执行处罚
             reportedContent = "举报已处理：" + resolution;

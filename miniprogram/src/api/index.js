@@ -13,19 +13,18 @@
  *   const data = await post('/auth/login', { code: 'xxx' });
  */
 
-// ── 后端 API 基础路径 ──────────────────────────────────────────
+// ── 后端切换：注释掉当前行，取消注释目标行即可 ──────────────
 //
-// 开发者工具模拟器：使用 localhost（模拟器和后端在同一台 PC 上）
-// 真机调试：改为 PC 当前局域网 IP（手机和 PC 需在同一网络）
-//   查看 PC 当前 IP：终端运行 ipconfig | grep "10\." | grep IPv4
-//   当前校园网 IP：http://10.96.197.124:8080/api
-//   手机热点时 IP：http://10.115.248.247:8080/api
+// Node.js 后端 (端口 3000)：
+// const BASE_URL = 'http://localhost:3000/api';               // ← 模拟器
+// const BASE_URL = 'http://10.115.248.247:3000/api';        // ← 真机 (热点)
+// const BASE_URL = 'http://10.96.197.124:3000/api';          // ← 真机 (校园网)
 //
-// 切换方式：注释/取消注释下面两行之一即可
+// Java 后端 (Gateway 端口 8080)：
+// const BASE_URL = 'http://localhost:8080/api';               // ← 模拟器
+   const BASE_URL = 'http://10.115.248.247:8080/api';          // ← 真机 (热点)
+// const BASE_URL = 'http://10.96.197.124:8080/api';           // ← 真机 (校园网)
 // ────────────────────────────────────────────────────────────────
-// const BASE_URL = 'http://localhost:8080/api';               // ← Java 后端 (Gateway)
-// const BASE_URL = 'http://10.96.197.124:8080/api';        // ← 校园网真机
-const BASE_URL = 'http://10.115.248.247:8080/api';       // ← 手机热点真机
 
 /** 图片服务器 origin，从 BASE_URL 派生 */
 const IMAGE_ORIGIN = BASE_URL.replace(/\/api$/, '');

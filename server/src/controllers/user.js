@@ -46,7 +46,7 @@ const userController = {
    */
   async updateProfile(req, res, next) {
     try {
-      const result = await userService.updateProfile(req.user.id, req.body);
+      const result = await userService.updateProfile(req.user.id, req.body, req.user.role);
       res.json({ code: 0, message: 'ok', data: result });
     } catch (err) {
       next(err);

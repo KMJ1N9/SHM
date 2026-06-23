@@ -1,6 +1,7 @@
 package com.shm.admin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shm.admin.feign.CoreUserFeign;
 import com.shm.admin.feign.ImConnectorFeign;
 import com.shm.admin.mapper.AdminLogMapper;
 import com.shm.admin.mapper.NotificationMapper;
@@ -11,7 +12,6 @@ import com.shm.common.exception.ErrorCode;
 import com.shm.common.model.entity.AdminLog;
 import com.shm.common.model.entity.Notification;
 import com.shm.common.model.entity.Report;
-import com.shm.common.model.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +44,8 @@ class ReportAdminServiceTest {
     private AdminLogMapper adminLogMapper;
     @Mock
     private ImConnectorFeign imConnectorFeign;
+    @Mock
+    private CoreUserFeign coreUserFeign;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -52,7 +54,8 @@ class ReportAdminServiceTest {
     @BeforeEach
     void setUp() {
         reportAdminService = new ReportAdminService(reportMapper, userMapper,
-                notificationMapper, adminLogMapper, objectMapper, imConnectorFeign);
+                notificationMapper, adminLogMapper, objectMapper,
+                imConnectorFeign, coreUserFeign);
     }
 
     // ============================================================
@@ -157,8 +160,8 @@ class ReportAdminServiceTest {
                 "情况说明，不做处罚", "none", 0);
 
         verify(reportMapper).resolve(1L, "情况说明，不做处罚");
-        // 不应有任何处罚操作
-        verify(userMapper, never()).updateStatus(anyLong(), anyString());
+        // Phase 13: 不应调用跨服务处罚
+        verify(coreUserFeign, never()).applyPenalty(anyLong(), any());
         verify(notificationMapper, never()).insert(any());
         assertEquals("resolved", result.get("status"));
     }
@@ -168,15 +171,15 @@ class ReportAdminServiceTest {
         Report ticket = buildReport(1L, 10L, 20L, "processing");
         when(reportMapper.findById(1L)).thenReturn(ticket);
 
-        User reported = User.builder()
-                .id(20L).nickname("被举报人").creditScore(80)
-                .build();
-        when(userMapper.findByIdForUpdate(20L)).thenReturn(reported);
-
-        User updated = User.builder()
-                .id(20L).nickname("被举报人").creditScore(70)
-                .build();
-        when(userMapper.findById(20L)).thenReturn(updated);
+        // Phase 13: Feign 调用 core-service 执行处罚
+        Map<String, Object> penaltyData = Map.of(
+                "userId", 20L,
+                "previousScore", 80,
+                "currentScore", 70,
+                "status", "active"
+        );
+        when(coreUserFeign.applyPenalty(eq(20L), any()))
+                .thenReturn(Map.of("code", 0, "message", "ok", "data", penaltyData));
 
         Map<String, Object> detail = Map.of("id", 1L, "status", "resolved");
         when(reportMapper.findDetailById(1L)).thenReturn(detail);
@@ -188,8 +191,8 @@ class ReportAdminServiceTest {
                 "违规发布", "deduct_credit", 10);
 
         verify(reportMapper).resolve(1L, "违规发布");
-        // creditMax 未注入 Spring @Value，默认 0；使用 anyInt() 避免严格匹配
-        verify(userMapper).updateCreditScore(eq(20L), eq(-10), anyInt());
+        // Phase 13: 验证跨服务处罚调用
+        verify(coreUserFeign).applyPenalty(eq(20L), any());
         verify(notificationMapper).insert(any(Notification.class));
         assertEquals("resolved", result.get("status"));
     }
@@ -198,6 +201,16 @@ class ReportAdminServiceTest {
     void resolveTicket_banPenalty_shouldBanAndNotify() {
         Report ticket = buildReport(1L, 10L, 20L, "processing");
         when(reportMapper.findById(1L)).thenReturn(ticket);
+
+        // Phase 13: Feign 调用 core-service 执行封禁
+        Map<String, Object> penaltyData = Map.of(
+                "userId", 20L,
+                "previousScore", 80,
+                "currentScore", 0,
+                "status", "banned"
+        );
+        when(coreUserFeign.applyPenalty(eq(20L), any()))
+                .thenReturn(Map.of("code", 0, "message", "ok", "data", penaltyData));
 
         Map<String, Object> detail = Map.of("id", 1L, "status", "resolved");
         when(reportMapper.findDetailById(1L)).thenReturn(detail);
@@ -209,7 +222,8 @@ class ReportAdminServiceTest {
                 "严重违规", "ban", 0);
 
         verify(reportMapper).resolve(1L, "严重违规");
-        verify(userMapper).updateStatus(20L, "banned");
+        // Phase 13: 验证跨服务封禁调用
+        verify(coreUserFeign).applyPenalty(eq(20L), any());
         verify(notificationMapper).insert(argThat(n ->
                 "ban".equals(n.getType()) && n.getUserId().equals(20L)));
         assertEquals("resolved", result.get("status"));

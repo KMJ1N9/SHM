@@ -61,9 +61,14 @@ public class JwtAuthGatewayFilter implements WebFilter, Ordered {
             new WhitelistEntry(HttpMethod.GET, "/api/health")
     );
 
-    /** 前缀白名单 — 这些路径下的所有请求都免鉴权（静态资源等） */
+    /** 前缀白名单 — 这些路径下的所有请求都免鉴权（静态资源 + 内部 API + Swagger） */
     private static final List<String> PREFIX_WHITELIST = List.of(
-            "/images/"
+            "/images/",
+            "/internal/",   // 内部微服务 API（使用 X-Internal-Token，非 JWT）
+            "/swagger-ui.html",
+            "/swagger-ui/",
+            "/v3/api-docs/",
+            "/webjars/"     // Swagger UI 静态资源 (CSS/JS)
     );
 
     private final JwtUtil jwtUtil;

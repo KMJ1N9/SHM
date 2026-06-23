@@ -111,7 +111,38 @@ spring.cloud.sentinel:
         data-type: json
         rule-type: degrade
 
+# ── SpringDoc OpenAPI (Phase 12) ──
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  show-actuator: false
+  default-produces-media-type: application/json
+
 # Feign + Sentinel 熔断 (Phase 9)
 feign:
   sentinel:
     enabled: true
+
+# ── Seata 分布式事务 (Phase 13) ──
+seata:
+  enabled: ${SEATA_ENABLED:false}
+  tx-service-group: shm-tx-group
+  enable-auto-data-source-proxy: true
+  registry:
+    type: file
+  config:
+    type: file
+  service:
+    vgroup-mapping:
+      shm-tx-group: default
+    grouplist:
+      default: ${SEATA_SERVER_ADDR:127.0.0.1:8091}
+  client:
+    rm:
+      report-success-enable: false
+    tm:
+      degrade-check-allow-times: 10

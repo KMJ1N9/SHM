@@ -167,11 +167,29 @@ public class UserService {
      * @param updates 要更新的字段（全部可选）
      * @return 更新后的用户信息
      */
-    public Map<String, Object> updateProfile(Long userId, UpdateProfileRequest updates) {
-        // 敏感词过滤：nickname
+    /**
+     * 非管理员用户禁止使用的昵称关键词
+     */
+    private static final java.util.List<String> RESERVED_NAME_KEYWORDS = java.util.List.of(
+            "管理员", "客服", "admin", "administrator", "moderator",
+            "系统", "官方", "平台小二", "校园小二"
+    );
+
+    public Map<String, Object> updateProfile(Long userId, UpdateProfileRequest updates, String userRole) {
+        // 敏感词过滤 + 管理员名称保护：nickname
         if (updates.getNickname() != null && !updates.getNickname().isEmpty()) {
-            if (sensitiveFilter.containsSensitive(updates.getNickname())) {
+            String nickname = updates.getNickname().trim();
+            if (sensitiveFilter.containsSensitive(nickname)) {
                 throw new BusinessException(ErrorCode.SENSITIVE_WORD);
+            }
+            // 管理员/客服名称保护：非管理员/客服用户不得使用
+            if (!"admin".equals(userRole) && !"cs".equals(userRole)) {
+                String lowerName = nickname.toLowerCase();
+                boolean matched = RESERVED_NAME_KEYWORDS.stream()
+                        .anyMatch(kw -> lowerName.contains(kw.toLowerCase()));
+                if (matched) {
+                    throw new BusinessException(ErrorCode.VALIDATION_ERROR, "该昵称仅限管理员/客服使用");
+                }
             }
         }
 
@@ -208,6 +226,48 @@ public class UserService {
     // ============================================================
     // Redis 缓存辅助方法（Phase 10）
     // ============================================================
+
+    /**
+     * 执行用户处罚（Phase 13 — 跨服务事务分支）
+     *
+     * <p>由 admin-service 的 ReportAdminService.resolveTicket() 通过 CoreUserFeign
+     * 调用此方法。在 Seata AT 模式中作为事务分支（RM）参与全局事务。
+     *
+     * @param userId  目标用户 ID
+     * @param request 处罚请求（penalty=deduct_credit/ban + deductCredit + reason + ticketId）
+     * @return { userId, previousScore, currentScore, status }
+     */
+    public Map<String, Object> applyPenalty(Long userId, com.shm.common.model.dto.internal.PenaltyRequest request) {
+        User user = userRepo.findById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        int previousScore = user.getCreditScore();
+        int currentScore = previousScore;
+        String newStatus = user.getStatus();
+
+        if ("ban".equals(request.getPenalty())) {
+            userRepo.updateStatus(userId, "banned");
+            newStatus = "banned";
+            log.info("用户封禁: userId={}, reason={}", userId, request.getReason());
+        } else if (request.getDeductCredit() > 0) {
+            userRepo.updateCreditScore(userId, -request.getDeductCredit(), 200);
+            currentScore = Math.max(0, previousScore - request.getDeductCredit());
+            log.info("信誉分扣减: userId={}, delta={}, {}→{}",
+                    userId, -request.getDeductCredit(), previousScore, currentScore);
+        }
+
+        // 清除用户缓存
+        evictUserCache(userId);
+
+        return Map.of(
+                "userId", userId,
+                "previousScore", previousScore,
+                "currentScore", currentScore,
+                "status", newStatus
+        );
+    }
 
     /** 清除用户缓存 */
     private void evictUserCache(Long userId) {

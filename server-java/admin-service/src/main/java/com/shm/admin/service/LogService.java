@@ -1,7 +1,11 @@
 package com.shm.admin.service;
 
 import com.shm.admin.mapper.AdminLogMapper;
+import com.shm.common.model.dto.admin.AdminLogRequest;
 import com.shm.common.model.dto.admin.LogQueryRequest;
+import com.shm.common.model.entity.AdminLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -16,10 +20,31 @@ import java.util.Map;
 @Service
 public class LogService {
 
+    private static final Logger log = LoggerFactory.getLogger(LogService.class);
+
     private final AdminLogMapper adminLogMapper;
 
     public LogService(AdminLogMapper adminLogMapper) {
         this.adminLogMapper = adminLogMapper;
+    }
+
+    /**
+     * 写入管理员操作日志（Phase 13 — 跨服务事务分支）
+     *
+     * <p>由 core-service 的 OrderService.confirm() 通过 AdminLogFeign 调用。
+     */
+    public long createLog(AdminLogRequest request) {
+        AdminLog adminLog = AdminLog.builder()
+                .adminId(request.getAdminId())
+                .action(request.getAction())
+                .targetType(request.getTargetType())
+                .targetId(request.getTargetId())
+                .reason(request.getReason())
+                .build();
+        adminLogMapper.insert(adminLog);
+        log.debug("审计日志写入: action={}, adminId={}, targetId={}",
+                request.getAction(), request.getAdminId(), request.getTargetId());
+        return adminLog.getId() != null ? adminLog.getId() : 0;
     }
 
     /**

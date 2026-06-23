@@ -76,6 +76,9 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .requestMatchers("POST", "/api/auth/refresh").permitAll()
                 .requestMatchers("GET", "/api/health").permitAll()
                 .requestMatchers("/error").permitAll()
+                .requestMatchers("/internal/**").permitAll()
+                // Swagger UI + API docs (Phase 12)
+                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )
             // 添加 JWT Filter

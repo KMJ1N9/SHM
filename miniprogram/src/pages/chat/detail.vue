@@ -157,6 +157,7 @@ import TIM from 'tim-wx-sdk';
 import { resolveImageUrl } from '@/api/index';
 import SafeImage from '@/components/SafeImage.vue';
 import { useUserStore } from '@/store/user';
+import { replaceSensitive } from '@/utils/sensitive-filter';
 import {
   getTim,
   isIMReady,
@@ -365,8 +366,11 @@ async function loadMoreHistory() {
  * 发送文本消息
  */
 async function sendMessage() {
-  const text = inputText.value.trim();
+  let text = inputText.value.trim();
   if (!text || sending.value) return;
+
+  // 敏感词过滤：将脏话替换为 ***
+  text = replaceSensitive(text);
 
   sending.value = true;
 

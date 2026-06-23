@@ -108,8 +108,8 @@ class ErrorCodeTest {
 
     @Test
     void values_shouldHaveExpectedCount() {
-        // 枚举总数 = 35（1 成功 + 4 认证 + 6 资源 + 7 业务 + 8 输入 + 3 权限 + 6 系统）
-        assertEquals(35, ErrorCode.values().length,
+        // 枚举总数 = 36（1 成功 + 4 认证 + 6 资源 + 7 业务 + 9 输入 + 3 权限 + 6 系统）
+        assertEquals(36, ErrorCode.values().length,
                 "枚举总数应与 Node.js 后端错误码完全一致");
     }
 

@@ -45,6 +45,17 @@ spring.servlet.multipart:
   max-file-size: 10MB
   max-request-size: 10MB
 
+# ── SpringDoc OpenAPI (Phase 12) ──
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  show-actuator: false
+  default-produces-media-type: application/json
+
 # ============================================================
 # 内部 API 共享密钥（defense-in-depth）
 # 本地开发留空 = 拦截器放行；生产环境通过 INTERNAL_TOKEN 环境变量注入

@@ -61,20 +61,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        // 1. 白名单放行
+        // 1. 内部 API 路径放行（由 InternalAuthInterceptor 校验 X-Internal-Token）
+        if (request.getRequestURI().startsWith("/internal/")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // 2. 白名单放行
         if (isWhitelisted(request)) {
             chain.doFilter(request, response);
             return;
         }
 
-        // 2. Gateway 透传路径：X-User-Id 头存在 → 信任 Gateway 的 JWT 验证结果
+        // 3. Gateway 透传路径：X-User-Id 头存在 → 信任 Gateway 的 JWT 验证结果
         String gatewayUserId = request.getHeader("X-User-Id");
         if (gatewayUserId != null && !gatewayUserId.isEmpty()) {
             if (!authenticateFromGateway(request, response, gatewayUserId)) {
                 return; // 错误响应已在 authenticateFromGateway 中写出
             }
         } else {
-            // 3. 直接访问路径：完整 JWT 验证（本地开发 / 无 Gateway 场景）
+            // 4. 直接访问路径：完整 JWT 验证（本地开发 / 无 Gateway 场景）
             if (!authenticateFromJwt(request, response)) {
                 return; // 错误响应已在 authenticateFromJwt 中写出
             }

@@ -106,6 +106,28 @@ spring:
           predicates:
             - Path=/api/health
 
+        # ── Swagger API Docs (Phase 12) ──
+        - id: core-api-docs
+          uri: lb://core-service
+          predicates:
+            - Path=/v3/api-docs/core
+          filters:
+            - RewritePath=/v3/api-docs/core, /v3/api-docs
+
+        - id: admin-api-docs
+          uri: lb://admin-service
+          predicates:
+            - Path=/v3/api-docs/admin
+          filters:
+            - RewritePath=/v3/api-docs/admin, /v3/api-docs
+
+        - id: im-api-docs
+          uri: lb://im-connector
+          predicates:
+            - Path=/v3/api-docs/im
+          filters:
+            - RewritePath=/v3/api-docs/im, /v3/api-docs
+
 # ── JWT 配置（仅 Access Token 验证，Refresh Token 由 core-service 处理） ──
 jwt:
   access-secret: ${JWT_ACCESS_SECRET:}
@@ -125,6 +147,21 @@ logging:
 # ── LoadBalancer 缓存 ──
 spring.cloud.loadbalancer.cache.enabled: true
 spring.cloud.loadbalancer.cache.ttl: 35s
+
+# ── SpringDoc OpenAPI (Phase 12: Gateway 聚合下游服务 API) ──
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    urls:
+      - name: core-service (商品/订单/用户/评价/举报)
+        url: /v3/api-docs/core
+      - name: admin-service (管理后台/数据看板)
+        url: /v3/api-docs/admin
+      - name: im-connector (IM/COS 连接器)
+        url: /v3/api-docs/im
 
 # ── Sentinel 限流 (Phase 9) ──
 spring.cloud.sentinel:

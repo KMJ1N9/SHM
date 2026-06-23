@@ -89,6 +89,12 @@
             </exclusions>
         </dependency>
 
+        <!-- SpringDoc OpenAPI (Phase 12: Gateway 聚合 Swagger) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

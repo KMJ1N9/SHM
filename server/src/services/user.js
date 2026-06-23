@@ -6,7 +6,23 @@
 
 const userRepo = require('../repository/user');
 const { cache } = require('../utils/cache');
-const { notFound } = require('../utils/errors');
+const { notFound, badRequest, sensitiveWord } = require('../utils/errors');
+const sensitiveFilter = require('../utils/sensitive-filter');
+
+/**
+ * 保留的管理员/客服名称关键词 — 非管理员用户昵称不得包含这些词
+ */
+const RESERVED_NAME_KEYWORDS = [
+  '管理员',
+  '客服',
+  'admin',
+  'administrator',
+  'moderator',
+  '系统',
+  '官方',
+  '平台小二',
+  '校园小二',
+];
 
 const userService = {
   /**
@@ -59,12 +75,32 @@ const userService = {
    * @param {Object} updates - { nickname?, avatar?, class_name?, dorm_building? }
    * @returns {Promise<Object>}
    */
-  async updateProfile(userId, updates) {
+  async updateProfile(userId, updates, userRole = '') {
     const allowed = ['nickname', 'avatar', 'class_name', 'dorm_building'];
     const filtered = {};
     for (const key of allowed) {
       if (updates[key] !== undefined && updates[key] !== null) {
         filtered[key] = updates[key];
+      }
+    }
+
+    // ── 昵称校验 ──
+    if (filtered.nickname) {
+      const nickname = filtered.nickname.trim();
+
+      // 1. 敏感词检查
+      const checkResult = sensitiveFilter.check(nickname);
+      if (checkResult.hasSensitive) {
+        throw sensitiveWord('昵称包含违规内容，请重新输入');
+      }
+
+      // 2. 管理员/客服名称保护：非管理员/客服不得使用
+      if (userRole !== 'admin' && userRole !== 'cs') {
+        const lowerName = nickname.toLowerCase();
+        const matched = RESERVED_NAME_KEYWORDS.find(kw => lowerName.includes(kw.toLowerCase()));
+        if (matched) {
+          throw badRequest('该昵称仅限管理员/客服使用');
+        }
       }
     }
 

@@ -57,6 +57,6 @@ public class UserController {
     @PutMapping("/api/users/me")
     public Map<String, Object> updateProfile(@CurrentUser UserPrincipal user,
                                               @RequestBody UpdateProfileRequest request) {
-        return ResponseBuilder.ok(userService.updateProfile(user.getUserId(), request));
+        return ResponseBuilder.ok(userService.updateProfile(user.getUserId(), request, user.getRole()));
     }
 }

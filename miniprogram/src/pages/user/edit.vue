@@ -78,9 +78,28 @@ import { useUserStore } from '@/store/user';
 import { updateProfile } from '@/api/user';
 import { resolveImageUrl } from '@/api/index';
 import { chooseAndUpload } from '@/utils/cos';
+import { hasSensitive } from '@/utils/sensitive-filter';
 import SafeImage from '@/components/SafeImage.vue';
 
 const userStore = useUserStore();
+
+/**
+ * 非管理员用户禁止使用的昵称关键词
+ *
+ * 普通用户昵称不得包含这些词（大小写不敏感），
+ * 只有 role='admin' 或 role='cs' 的真实管理员/客服才能使用。
+ */
+const RESERVED_NAME_KEYWORDS = [
+  '管理员',
+  '客服',
+  'admin',
+  'administrator',
+  'moderator',
+  '系统',
+  '官方',
+  '平台小二',
+  '校园小二',
+];
 
 const form = reactive({
   avatar: userStore.user?.avatar || '',
@@ -107,6 +126,23 @@ async function onSave() {
   if (!form.nickname.trim()) {
     uni.showToast({ title: '昵称不能为空', icon: 'none' });
     return;
+  }
+
+  // ── 敏感词校验 ──
+  if (hasSensitive(form.nickname.trim())) {
+    uni.showToast({ title: '昵称包含违规内容，请重新输入', icon: 'none' });
+    return;
+  }
+
+  // ── 管理员/客服名称保护：普通用户不得使用 ──
+  const userRole = userStore.user?.role || '';
+  if (userRole !== 'admin' && userRole !== 'cs') {
+    const lowerName = form.nickname.trim().toLowerCase();
+    const matched = RESERVED_NAME_KEYWORDS.find(kw => lowerName.includes(kw.toLowerCase()));
+    if (matched) {
+      uni.showToast({ title: '该昵称仅限管理员/客服使用', icon: 'none' });
+      return;
+    }
   }
 
   saving.value = true;

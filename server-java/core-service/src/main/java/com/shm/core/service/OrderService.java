@@ -10,22 +10,26 @@ import com.shm.common.model.entity.Notification;
 import com.shm.common.model.entity.Order;
 import com.shm.common.model.entity.Product;
 import com.shm.common.model.entity.User;
+import com.shm.common.model.dto.admin.AdminLogRequest;
 import com.shm.core.config.CreditProperties;
+import com.shm.core.feign.AdminLogFeign;
 import com.shm.core.feign.ImConnectorFeign;
+import com.shm.core.lock.DistributedLocker;
 import com.shm.core.repository.NotificationRepository;
 import com.shm.core.repository.OrderRepository;
 import com.shm.core.repository.ProductRepository;
 import com.shm.core.repository.UserRepository;
+import io.seata.spring.annotation.GlobalTransactional;
+import org.redisson.api.RLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 订单服务（与 Node.js services/order.js 行为完全一致）
@@ -53,7 +57,8 @@ public class OrderService {
     private final ObjectMapper objectMapper;
     private final CreditProperties creditProps;
     private final ImConnectorFeign imConnectorFeign;
-    private final StringRedisTemplate redis;
+    private final DistributedLocker distributedLocker;
+    private final AdminLogFeign adminLogFeign;
 
     /** 下单分布式锁 TTL（秒） */
     private static final long ORDER_LOCK_TTL = 30;
@@ -61,7 +66,8 @@ public class OrderService {
     public OrderService(OrderRepository orderRepo, ProductRepository productRepo,
                         UserRepository userRepo, NotificationRepository notificationRepo,
                         ObjectMapper objectMapper, CreditProperties creditProps,
-                        ImConnectorFeign imConnectorFeign, StringRedisTemplate redis) {
+                        ImConnectorFeign imConnectorFeign, DistributedLocker distributedLocker,
+                        AdminLogFeign adminLogFeign) {
         this.orderRepo = orderRepo;
         this.productRepo = productRepo;
         this.userRepo = userRepo;
@@ -69,7 +75,8 @@ public class OrderService {
         this.objectMapper = objectMapper;
         this.creditProps = creditProps;
         this.imConnectorFeign = imConnectorFeign;
-        this.redis = redis;
+        this.distributedLocker = distributedLocker;
+        this.adminLogFeign = adminLogFeign;
     }
 
     // ============================================================
@@ -88,10 +95,10 @@ public class OrderService {
             throw new BusinessException(ErrorCode.CREDIT_TOO_LOW_TRADE, "信誉分不足（需 ≥ " + creditProps.getTradeThreshold() + "），无法参与交易");
         }
 
-        // 分布式锁（防重复下单，Phase 10）
+        // 分布式锁（防重复下单，Phase 16 Redisson 增强：WatchDog + 可重入）
         String lockKey = RedisKeys.orderLockKey(buyerId, data.getProductId());
-        Boolean locked = redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(ORDER_LOCK_TTL));
-        if (!Boolean.TRUE.equals(locked)) {
+        RLock lock = distributedLocker.tryAcquire(lockKey, ORDER_LOCK_TTL, TimeUnit.SECONDS);
+        if (lock == null) {
             log.warn("下单分布式锁冲突: buyerId={}, productId={}", buyerId, data.getProductId());
             // 获取锁失败 → 检查是否是幂等请求（并发场景下第一个请求已创建订单）
             String idempotentKey = buyerId + "_" + data.getProductId();
@@ -108,12 +115,7 @@ public class OrderService {
         try {
             return doCreate(buyerId, creditScore, data);
         } finally {
-            // 释放锁
-            try {
-                redis.delete(lockKey);
-            } catch (Exception e) {
-                log.warn("下单分布式锁释放失败，将在 TTL 后自动过期: key={}", lockKey);
-            }
+            distributedLocker.release(lock);
         }
     }
 
@@ -285,7 +287,14 @@ public class OrderService {
      * 确认收货（仅买家，与 Node.js orderService.confirm 一致）
      *
      * <p>事务内原子操作：FOR UPDATE 锁订单 → 校验 → 更新订单 + 商品 → 卖家信誉分+2。
+     *
+     * <h3>Phase 13 — Seata 全局事务</h3>
+     * <p>{@code @GlobalTransactional} 将本方法注册为 Seata 全局事务入口。
+     * core-service 本地写操作（订单/商品/用户/通知）为分支 1，
+     * Feign 调用 admin-service 写审计日志为分支 2。
+     * 任一分支失败 → Seata TC 协调两阶段回滚（undo_log 快照回滚）。
      */
+    @GlobalTransactional(timeoutMills = 300000, name = "confirm-order")
     @Transactional
     public Map<String, Object> confirm(Long orderId, Long userId) {
         Order order = orderRepo.findByIdForUpdate(orderId);
@@ -320,6 +329,26 @@ public class OrderService {
                 "订单已完成，请互相评价", orderId);
         notifyUser(order.getSellerId(), "order_update", "订单完成",
                 "订单已完成，请互相评价", orderId);
+
+        // Phase 13 — Seata 跨服务事务分支：Feign 调用 admin-service 写入审计日志
+        try {
+            AdminLogRequest logReq = new AdminLogRequest(
+                    userId, "buyer_confirm", "order", orderId,
+                    "买家确认收货, productId=" + order.getProductId()
+                            + ", sellerId=" + order.getSellerId());
+            Map<String, Object> logResult = adminLogFeign.createLog(logReq);
+            if (logResult != null) {
+                int code = ((Number) logResult.getOrDefault("code", 0)).intValue();
+                if (code != 0) {
+                    log.warn("审计日志写入失败（Seata 分支将回滚）: code={}, message={}", code, logResult.get("message"));
+                    throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE,
+                            "审计日志写入失败: " + logResult.get("message"));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("审计日志写入异常（Seata 分支将回滚）: error={}", e.getMessage());
+            throw e; // 抛出异常触发 Seata 回滚
+        }
 
         Order updated = orderRepo.findById(orderId);
         return toOrderMap(updated, fetchUsersForOrder(updated.getBuyerId(), updated.getSellerId()));

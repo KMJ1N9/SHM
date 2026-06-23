@@ -211,7 +211,7 @@ class UserServiceTest {
                 .dormBuilding("B栋").avatar("/a.png").build();
         when(userRepo.findById(10L)).thenReturn(updated);
 
-        Map<String, Object> result = userService.updateProfile(10L, req);
+        Map<String, Object> result = userService.updateProfile(10L, req, "user");
 
         assertEquals("新昵称", result.get("nickname"));
         assertEquals("计科2302", result.get("class_name"));
@@ -226,7 +226,7 @@ class UserServiceTest {
         when(sensitiveFilter.containsSensitive("敏感词昵称")).thenReturn(true);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
-                userService.updateProfile(10L, req));
+                userService.updateProfile(10L, req, "user"));
 
         assertEquals(ErrorCode.SENSITIVE_WORD.getCode(), ex.getCode());
     }
@@ -239,7 +239,7 @@ class UserServiceTest {
         when(userRepo.updateProfile(any(User.class))).thenReturn(0);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
-                userService.updateProfile(10L, req));
+                userService.updateProfile(10L, req, "user"));
 
         assertEquals(ErrorCode.NOT_FOUND.getCode(), ex.getCode());
     }
@@ -256,8 +256,58 @@ class UserServiceTest {
                 .avatar("").dormBuilding("").build();
         when(userRepo.findById(10L)).thenReturn(updated);
 
-        userService.updateProfile(10L, req);
+        userService.updateProfile(10L, req, "user");
 
         verify(sensitiveFilter, never()).containsSensitive(anyString());
+    }
+
+    @Test
+    void updateProfile_reservedName_shouldThrowForNormalUser() {
+        UpdateProfileRequest req = new UpdateProfileRequest();
+        req.setNickname("我是管理员");
+
+        when(sensitiveFilter.containsSensitive("我是管理员")).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                userService.updateProfile(10L, req, "user"));
+
+        assertEquals(ErrorCode.VALIDATION_ERROR.getCode(), ex.getCode());
+    }
+
+    @Test
+    void updateProfile_reservedName_shouldPassForAdmin() {
+        UpdateProfileRequest req = new UpdateProfileRequest();
+        req.setNickname("平台管理员");
+        req.setClassName("管理员");
+
+        when(sensitiveFilter.containsSensitive("平台管理员")).thenReturn(false);
+        when(userRepo.updateProfile(any(User.class))).thenReturn(1);
+        User updated = User.builder()
+                .id(10L).nickname("平台管理员").className("管理员")
+                .avatar("").dormBuilding("").build();
+        when(userRepo.findById(10L)).thenReturn(updated);
+
+        // admin 用户可以使用保留名
+        Map<String, Object> result = userService.updateProfile(10L, req, "admin");
+
+        assertEquals("平台管理员", result.get("nickname"));
+    }
+
+    @Test
+    void updateProfile_reservedName_shouldPassForCS() {
+        UpdateProfileRequest req = new UpdateProfileRequest();
+        req.setNickname("客服小助手");
+
+        when(sensitiveFilter.containsSensitive("客服小助手")).thenReturn(false);
+        when(userRepo.updateProfile(any(User.class))).thenReturn(1);
+        User updated = User.builder()
+                .id(10L).nickname("客服小助手")
+                .className("").avatar("").dormBuilding("").build();
+        when(userRepo.findById(10L)).thenReturn(updated);
+
+        // cs 用户可以使用保留名
+        Map<String, Object> result = userService.updateProfile(10L, req, "cs");
+
+        assertEquals("客服小助手", result.get("nickname"));
     }
 }

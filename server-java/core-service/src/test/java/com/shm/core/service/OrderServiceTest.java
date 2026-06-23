@@ -2,7 +2,6 @@ package com.shm.core.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.shm.common.constant.RedisKeys;
 import com.shm.common.exception.BusinessException;
 import com.shm.common.exception.ErrorCode;
 import com.shm.common.model.dto.order.CreateOrderRequest;
@@ -10,7 +9,9 @@ import com.shm.common.model.entity.Order;
 import com.shm.common.model.entity.Product;
 import com.shm.common.model.entity.User;
 import com.shm.core.config.CreditProperties;
+import com.shm.core.feign.AdminLogFeign;
 import com.shm.core.feign.ImConnectorFeign;
+import com.shm.core.lock.DistributedLocker;
 import com.shm.core.repository.NotificationRepository;
 import com.shm.core.repository.OrderRepository;
 import com.shm.core.repository.ProductRepository;
@@ -20,14 +21,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.redisson.api.RLock;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -55,9 +55,11 @@ class OrderServiceTest {
     @Mock
     private ImConnectorFeign imConnectorFeign;
     @Mock
-    private StringRedisTemplate redis;
+    private DistributedLocker distributedLocker;
     @Mock
-    private ValueOperations<String, String> valueOps;
+    private AdminLogFeign adminLogFeign;
+    @Mock
+    private RLock rLock;
 
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
@@ -67,12 +69,21 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(orderRepo, productRepo, userRepo,
-                notificationRepo, objectMapper, creditProps, imConnectorFeign, redis);
+                notificationRepo, objectMapper, creditProps, imConnectorFeign, distributedLocker,
+                adminLogFeign);
+        lenient().when(rLock.getName()).thenReturn("shm:lock:test");
     }
 
-    /** 仅在需要 Redis 分布式锁的 create 测试中启用 valueOps mock */
-    private void mockRedisValueOps() {
-        when(redis.opsForValue()).thenReturn(valueOps);
+    /** Mock 分布式锁获取成功 */
+    private void mockLockAcquired() {
+        when(distributedLocker.tryAcquire(anyString(), anyLong(), any(TimeUnit.class)))
+                .thenReturn(rLock);
+    }
+
+    /** Mock 分布式锁获取失败 */
+    private void mockLockConflict() {
+        when(distributedLocker.tryAcquire(anyString(), anyLong(), any(TimeUnit.class)))
+                .thenReturn(null);
     }
 
     // ============================================================
@@ -81,10 +92,7 @@ class OrderServiceTest {
 
     @Test
     void create_success_shouldLockAndCreateOrder() {
-        mockRedisValueOps();
-        // 分布式锁获取成功
-        String lockKey = RedisKeys.orderLockKey(1L, 100L);
-        when(valueOps.setIfAbsent(eq(lockKey), eq("1"), any(Duration.class))).thenReturn(true);
+        mockLockAcquired();
 
         CreateOrderRequest req = new CreateOrderRequest();
         req.setProductId(100L);
@@ -126,16 +134,14 @@ class OrderServiceTest {
         assertEquals(true, result.get("created"));
 
         // 验证锁释放
-        verify(redis).delete(lockKey);
+        verify(distributedLocker).release(rLock);
         // 验证商品状态更新为 reserved
         verify(productRepo).updateStatus(100L, "reserved");
     }
 
     @Test
     void create_idempotent_shouldReturnExistingOrder() {
-        mockRedisValueOps();
-        String lockKey = RedisKeys.orderLockKey(1L, 100L);
-        when(valueOps.setIfAbsent(eq(lockKey), eq("1"), any(Duration.class))).thenReturn(true);
+        mockLockAcquired();
 
         CreateOrderRequest req = new CreateOrderRequest();
         req.setProductId(100L);
@@ -159,10 +165,7 @@ class OrderServiceTest {
 
     @Test
     void create_lockConflict_existingOrder_shouldReturnIdempotent() {
-        mockRedisValueOps();
-        // 锁获取失败（并发场景）
-        String lockKey = RedisKeys.orderLockKey(1L, 100L);
-        when(valueOps.setIfAbsent(eq(lockKey), eq("1"), any(Duration.class))).thenReturn(false);
+        mockLockConflict();
 
         CreateOrderRequest req = new CreateOrderRequest();
         req.setProductId(100L);
@@ -185,9 +188,7 @@ class OrderServiceTest {
 
     @Test
     void create_lockConflict_noExistingOrder_shouldThrowRateLimited() {
-        mockRedisValueOps();
-        String lockKey = RedisKeys.orderLockKey(1L, 100L);
-        when(valueOps.setIfAbsent(eq(lockKey), eq("1"), any(Duration.class))).thenReturn(false);
+        mockLockConflict();
 
         CreateOrderRequest req = new CreateOrderRequest();
         req.setProductId(100L);
@@ -214,9 +215,7 @@ class OrderServiceTest {
 
     @Test
     void create_cannotBuyOwn_shouldThrowBusinessException() {
-        mockRedisValueOps();
-        String lockKey = RedisKeys.orderLockKey(1L, 100L);
-        when(valueOps.setIfAbsent(eq(lockKey), eq("1"), any(Duration.class))).thenReturn(true);
+        mockLockAcquired();
 
         CreateOrderRequest req = new CreateOrderRequest();
         req.setProductId(100L);
@@ -233,14 +232,12 @@ class OrderServiceTest {
                 orderService.create(1L, 80, req));
 
         assertEquals(ErrorCode.CANNOT_BUY_OWN.getCode(), ex.getCode());
-        verify(redis).delete(lockKey);
+        verify(distributedLocker).release(rLock);
     }
 
     @Test
     void create_productNotActive_shouldThrowBusinessException() {
-        mockRedisValueOps();
-        String lockKey = RedisKeys.orderLockKey(1L, 100L);
-        when(valueOps.setIfAbsent(eq(lockKey), eq("1"), any(Duration.class))).thenReturn(true);
+        mockLockAcquired();
 
         CreateOrderRequest req = new CreateOrderRequest();
         req.setProductId(100L);
@@ -255,7 +252,7 @@ class OrderServiceTest {
                 orderService.create(1L, 80, req));
 
         assertEquals(ErrorCode.PRODUCT_NOT_ACTIVE.getCode(), ex.getCode());
-        verify(redis).delete(lockKey);
+        verify(distributedLocker).release(rLock);
     }
 
     // ============================================================
@@ -383,6 +380,9 @@ class OrderServiceTest {
 
         when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
                 .thenReturn(Map.of("code", 0));
+
+        // Phase 13: Seata 跨服务分支 — 审计日志 Feign
+        when(adminLogFeign.createLog(any())).thenReturn(Map.of("code", 0));
 
         Order completed = buildOrder(1L, 100L, 1L, 10L, "completed");
         completed.setConfirmedAt(LocalDateTime.now());
