@@ -39,4 +39,16 @@ public interface OrderMapper {
      * 按用户角色计数 — 实现在 OrderMapper.xml
      */
     long countByUserRole(@Param("userId") Long userId, @Param("role") String role, @Param("status") String status);
+
+    /**
+     * 查询超时未处理的 pending 订单（Phase 14: 订单超时自动取消）
+     */
+    @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE status = 'pending' AND created_at < #{cutoff}")
+    List<Order> selectPendingOlderThan(@Param("cutoff") java.time.LocalDateTime cutoff);
+
+    /**
+     * 超时取消订单（Phase 14）
+     */
+    @Update("UPDATE orders SET status = 'cancelled', cancelled_by = #{cancelledBy}, updated_at = NOW() WHERE id = #{id}")
+    int cancelTimeout(@Param("id") Long id, @Param("cancelledBy") String cancelledBy);
 }

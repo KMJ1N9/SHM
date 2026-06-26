@@ -1,0 +1,55 @@
+# ── 本地开发版：仅启动基础设施，微服务在 IDE 中运行 ──
+# 启动: docker compose -f docker-compose.local.yml up -d
+# 停止: docker compose -f docker-compose.local.yml down
+
+name: shm-dev
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: shm-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: campus_market_dev
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: shm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  nacos:
+    image: nacos/nacos-server:v2.5.2
+    container_name: shm-nacos
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    restart: unless-stopped
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: shm-zipkin
+    ports:
+      - "9411:9411"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:

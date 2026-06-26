@@ -3,15 +3,17 @@ package com.shm.admin.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shm.admin.feign.ImConnectorFeign;
 import com.shm.admin.mapper.AdminLogMapper;
+import com.shm.admin.mq.ReportEventPublisher;
 import com.shm.admin.mapper.ProductMapper;
 import com.shm.common.exception.BusinessException;
 import com.shm.common.exception.ErrorCode;
+import com.shm.common.model.dto.message.ReportEventMessage;
 import com.shm.common.model.entity.AdminLog;
 import com.shm.common.model.entity.Product;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,14 +33,14 @@ public class ProductAdminService {
     private final ProductMapper productMapper;
     private final AdminLogMapper adminLogMapper;
     private final ObjectMapper objectMapper;
-    private final ImConnectorFeign imConnectorFeign;
+    private final ObjectProvider<ReportEventPublisher> reportEventPublisher;
 
     public ProductAdminService(ProductMapper productMapper, AdminLogMapper adminLogMapper,
-                                ObjectMapper objectMapper, ImConnectorFeign imConnectorFeign) {
+                                ObjectMapper objectMapper, ObjectProvider<ReportEventPublisher> reportEventPublisher) {
         this.productMapper = productMapper;
         this.adminLogMapper = adminLogMapper;
         this.objectMapper = objectMapper;
-        this.imConnectorFeign = imConnectorFeign;
+        this.reportEventPublisher = reportEventPublisher;
     }
 
     /**
@@ -147,16 +149,15 @@ public class ProductAdminService {
      */
     private void pushImMessage(Long userId, String title, String content) {
         try {
-            Map<String, Object> result = imConnectorFeign.sendSystemMessage(
-                    String.valueOf(userId), title, content, null);
-            if (result != null && result.containsKey("code")) {
-                int code = ((Number) result.get("code")).intValue();
-                if (code != 0) {
-                    log.warn("IM 推送失败: userId={}, code={}, message={}", userId, code, result.get("message"));
-                }
-            }
+            ReportEventMessage event = ReportEventMessage.builder()
+                    .targetUids(List.of(String.valueOf(userId)))
+                    .title(title)
+                    .content(content)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            reportEventPublisher.ifAvailable(p -> p.publishReportEvent(event));
         } catch (Exception e) {
-            log.warn("IM 推送异常（已降级为站内通知）: userId={}, error={}", userId, e.getMessage());
+            log.warn("商品下架事件发布异常（已降级为站内通知）: userId={}, error={}", userId, e.getMessage());
         }
     }
 }

@@ -1,0 +1,224 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Quick Facts",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [{ "expr": "process_uptime_seconds{application=~\"$application\"}", "legendFormat": "", "refId": "A" }],
+      "title": "Uptime",
+      "type": "stat",
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 4, "y": 1 },
+      "id": 3,
+      "options": { "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "expr": "process_start_time_seconds{application=~\"$application\"}*1000", "legendFormat": "", "refId": "A" }],
+      "title": "Start Time",
+      "type": "stat",
+      "fieldConfig": { "defaults": { "unit": "dateTimeAsIso" } }
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 9, "y": 1 },
+      "id": 4,
+      "options": { "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "expr": "jvm_memory_used_bytes{application=~\"$application\",area=\"heap\"}", "legendFormat": "", "refId": "A" }],
+      "title": "Heap Used",
+      "type": "stat",
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 14, "y": 1 },
+      "id": 5,
+      "options": { "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "expr": "jvm_threads_live_threads{application=~\"$application\"}", "legendFormat": "", "refId": "A" }],
+      "title": "Threads Live",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 1 },
+      "id": 6,
+      "options": { "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "expr": "jvm_classes_loaded_classes{application=~\"$application\"}", "legendFormat": "", "refId": "A" }],
+      "title": "Classes Loaded",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 10,
+      "title": "HTTP — 请求量与延迟",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 6 },
+      "id": 11,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "rate(http_server_requests_seconds_count{application=~\"$application\"}[1m])", "legendFormat": "{{uri}}", "refId": "A" }
+      ],
+      "title": "HTTP 请求速率 (QPS)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 6 },
+      "id": 12,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right" } },
+      "targets": [
+        { "expr": "rate(http_server_requests_seconds_sum{application=~\"$application\"}[1m]) / rate(http_server_requests_seconds_count{application=~\"$application\"}[1m])", "legendFormat": "{{uri}}", "refId": "A" }
+      ],
+      "title": "HTTP 平均响应时间",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 20,
+      "title": "JVM — 内存与 GC",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "id": 21,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "jvm_memory_used_bytes{application=~\"$application\"}", "legendFormat": "{{area}} {{id}}", "refId": "A" }
+      ],
+      "title": "JVM 内存使用",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "id": 22,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "rate(jvm_gc_pause_seconds_count{application=~\"$application\"}[2m])", "legendFormat": "{{action}} {{cause}}", "refId": "A" }
+      ],
+      "title": "GC 频率",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 30,
+      "title": "JVM — CPU 与线程",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "id": 31,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "process_cpu_usage{application=~\"$application\"}", "legendFormat": "{{application}}", "refId": "A" },
+        { "expr": "system_cpu_usage", "legendFormat": "System", "refId": "B" }
+      ],
+      "title": "CPU 使用率",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 } }
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "id": 32,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "jvm_threads_live_threads{application=~\"$application\"}", "legendFormat": "{{application}}", "refId": "A" }
+      ],
+      "title": "活跃线程数",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 40,
+      "title": "Tomcat — 连接与线程池",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "id": 41,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "tomcat_threads_current_threads{application=~\"$application\"}", "legendFormat": "{{application}}", "refId": "A" },
+        { "expr": "tomcat_threads_busy_threads{application=~\"$application\"}", "legendFormat": "{{application}} busy", "refId": "B" }
+      ],
+      "title": "Tomcat 线程使用",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "id": 42,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "tomcat_servlet_request_seconds_max{application=~\"$application\"}", "legendFormat": "{{name}} max", "refId": "A" }
+      ],
+      "title": "Tomcat 请求最大耗时",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["spring-boot", "jvm", "shm"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus" },
+        "definition": "label_values(application)",
+        "label": "Application",
+        "name": "application",
+        "query": { "query": "label_values(application)", "refId": "StandardVariableQuery" },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "SHM — 校园二手交易平台监控",
+  "version": 1
+}

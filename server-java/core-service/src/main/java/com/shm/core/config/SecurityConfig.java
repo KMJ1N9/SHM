@@ -79,6 +79,8 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .requestMatchers("/internal/**").permitAll()
                 // Swagger UI + API docs (Phase 12)
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // Actuator endpoints (Prometheus metrics, health)
+                .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             )
             // 添加 JWT Filter

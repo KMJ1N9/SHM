@@ -10,8 +10,8 @@ import com.shm.common.model.entity.Product;
 import com.shm.common.model.entity.User;
 import com.shm.core.config.CreditProperties;
 import com.shm.core.feign.AdminLogFeign;
-import com.shm.core.feign.ImConnectorFeign;
 import com.shm.core.lock.DistributedLocker;
+import com.shm.core.mq.OrderEventPublisher;
 import com.shm.core.repository.NotificationRepository;
 import com.shm.core.repository.OrderRepository;
 import com.shm.core.repository.ProductRepository;
@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RLock;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -53,7 +54,7 @@ class OrderServiceTest {
     @Mock
     private CreditProperties creditProps;
     @Mock
-    private ImConnectorFeign imConnectorFeign;
+    private OrderEventPublisher orderEventPublisher;
     @Mock
     private DistributedLocker distributedLocker;
     @Mock
@@ -69,8 +70,11 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(orderRepo, productRepo, userRepo,
-                notificationRepo, objectMapper, creditProps, imConnectorFeign, distributedLocker,
-                adminLogFeign);
+                notificationRepo, objectMapper, creditProps,
+                new ObjectProvider<OrderEventPublisher>() {
+                    @Override public OrderEventPublisher getObject() { return orderEventPublisher; }
+                },
+                distributedLocker, adminLogFeign);
         lenient().when(rLock.getName()).thenReturn("shm:lock:test");
     }
 
@@ -123,9 +127,8 @@ class OrderServiceTest {
                 .build();
         when(orderRepo.create(any(Order.class))).thenReturn(created);
 
-        // IM 推送成功
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        // MQ 发布（默认不抛出异常）
+        doNothing().when(orderEventPublisher).publishOrderEvent(any());
 
         Map<String, Object> result = orderService.create(1L, 80, req);
 
@@ -329,9 +332,8 @@ class OrderServiceTest {
         Order o = buildOrder(1L, 100L, 1L, 10L, "pending");
         when(orderRepo.findByIdForUpdate(1L)).thenReturn(o);
 
-        // IM 推送成功
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        // MQ 发布（默认不抛出异常）
+        doNothing().when(orderEventPublisher).publishOrderEvent(any());
 
         Order updated = buildOrder(1L, 100L, 1L, 10L, "met");
         updated.setMetAt(LocalDateTime.now());
@@ -378,8 +380,7 @@ class OrderServiceTest {
         when(creditProps.getRewardTransaction()).thenReturn(2);
         when(creditProps.getMax()).thenReturn(200);
 
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        doNothing().when(orderEventPublisher).publishOrderEvent(any());
 
         // Phase 13: Seata 跨服务分支 — 审计日志 Feign
         when(adminLogFeign.createLog(any())).thenReturn(Map.of("code", 0));
@@ -428,8 +429,7 @@ class OrderServiceTest {
         o.setProductId(100L);
         when(orderRepo.findByIdForUpdate(1L)).thenReturn(o);
 
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        doNothing().when(orderEventPublisher).publishOrderEvent(any());
 
         Order cancelled = buildOrder(1L, 100L, 1L, 10L, "cancelled");
         cancelled.setCancelledBy("buyer");
@@ -449,8 +449,7 @@ class OrderServiceTest {
         o.setProductId(100L);
         when(orderRepo.findByIdForUpdate(1L)).thenReturn(o);
 
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        doNothing().when(orderEventPublisher).publishOrderEvent(any());
 
         Order cancelled = buildOrder(1L, 100L, 1L, 10L, "cancelled");
         cancelled.setCancelledBy("seller");
@@ -469,8 +468,7 @@ class OrderServiceTest {
         o.setProductId(100L);
         when(orderRepo.findByIdForUpdate(1L)).thenReturn(o);
 
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        doNothing().when(orderEventPublisher).publishOrderEvent(any());
 
         Order cancelled = buildOrder(1L, 100L, 1L, 10L, "cancelled");
         cancelled.setCancelledBy("buyer");

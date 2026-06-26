@@ -6,6 +6,11 @@ spring:
     name: im-connector
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  autoconfigure:
+    exclude:
+      # im-connector 的 COS SDK 拖了 OkHttp 2.x，与 Zipkin/Actuator 需要的 OkHttp 4.x 冲突
+      # 排除 Zipkin 自动配置避免 RestTemplateSender 加载 OkHttp3 时 NoSuchFieldError: Companion
+      - org.springframework.boot.actuate.autoconfigure.tracing.zipkin.ZipkinAutoConfiguration
   cloud:
     nacos:
       discovery:
@@ -63,3 +68,23 @@ springdoc:
 # ============================================================
 internal:
   token: ${INTERNAL_TOKEN:}
+
+# ── 监控指标（Prometheus）──
+# Zipkin 追踪禁用：im-connector 的 COS SDK 拖了 OkHttp 2.x，与 Zipkin RestTemplateSender 的 OkHttp 4.x 冲突
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      enabled: false

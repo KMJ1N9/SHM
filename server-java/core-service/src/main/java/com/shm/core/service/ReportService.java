@@ -10,7 +10,8 @@ import com.shm.common.model.entity.Order;
 import com.shm.common.model.entity.Product;
 import com.shm.common.model.entity.Report;
 import com.shm.common.model.entity.User;
-import com.shm.core.feign.ImConnectorFeign;
+import com.shm.common.model.dto.message.ReportEventMessage;
+import com.shm.core.mq.OrderEventPublisher;
 import com.shm.core.repository.NotificationRepository;
 import com.shm.core.repository.OrderRepository;
 import com.shm.core.repository.ProductRepository;
@@ -18,6 +19,7 @@ import com.shm.core.repository.ReportRepository;
 import com.shm.core.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -38,20 +40,20 @@ public class ReportService {
     private final ProductRepository productRepo;
     private final UserRepository userRepo;
     private final NotificationRepository notificationRepo;
-    private final ImConnectorFeign imConnectorFeign;
+    private final ObjectProvider<OrderEventPublisher> orderEventPublisher;
     private final ObjectMapper objectMapper;
 
     public ReportService(ReportRepository reportRepo, OrderRepository orderRepo,
                          ProductRepository productRepo, UserRepository userRepo,
                          NotificationRepository notificationRepo,
-                         ImConnectorFeign imConnectorFeign,
+                         ObjectProvider<OrderEventPublisher> orderEventPublisher,
                          ObjectMapper objectMapper) {
         this.reportRepo = reportRepo;
         this.orderRepo = orderRepo;
         this.productRepo = productRepo;
         this.userRepo = userRepo;
         this.notificationRepo = notificationRepo;
-        this.imConnectorFeign = imConnectorFeign;
+        this.orderEventPublisher = orderEventPublisher;
         this.objectMapper = objectMapper;
     }
 
@@ -152,21 +154,25 @@ public class ReportService {
             notificationRepo.insert(notification);
             log.info("管理员举报通知已写入: adminId={}, reportId={}", admin.getId(), report.getId());
 
-            // 2. 推送 IM 实时消息（静默降级）
-            try {
-                Map<String, Object> imResult = imConnectorFeign.sendSystemMessage(
-                        String.valueOf(admin.getId()), title, content, report.getId());
-                if (imResult != null && imResult.containsKey("code")) {
-                    int code = ((Number) imResult.get("code")).intValue();
-                    if (code != 0) {
-                        log.warn("管理员 IM 推送失败: adminId={}, code={}, message={}",
-                                admin.getId(), code, imResult.get("message"));
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("管理员 IM 推送异常（已降级为站内通知）: adminId={}, error={}",
-                        admin.getId(), e.getMessage());
-            }
+        }
+
+        // 2. 通过 RocketMQ 异步推送 IM 实时消息（由 ImPushReportConsumer 消费）
+        try {
+            List<String> adminUids = admins.stream()
+                    .map(a -> String.valueOf(a.getId()))
+                    .collect(Collectors.toList());
+            ReportEventMessage event = ReportEventMessage.builder()
+                    .reportId(report.getId())
+                    .action("NEW_REPORT")
+                    .title(title)
+                    .content(content)
+                    .targetUids(adminUids)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            orderEventPublisher.ifAvailable(p -> p.publishReportEvent(event));
+        } catch (Exception e) {
+            log.warn("举报事件发布异常（已降级为站内通知）: reportId={}, error={}",
+                    report.getId(), e.getMessage());
         }
     }
 

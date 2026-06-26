@@ -1,0 +1,165 @@
+# ── 校园二手交易平台 — Docker Compose 一键启动 ──
+# docker compose up -d  →  启动
+# docker compose down   →  停止
+#
+# 架构: Docker(Nacos + Redis + Java服务 + Zipkin + Prometheus + Grafana) + 本地(MySQL)
+# 密钥: .env 文件（gitignored）
+
+name: shm
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: shm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  nacos:
+    image: nacos/nacos-server:v2.5.2
+    container_name: shm-nacos
+    environment:
+      MODE: standalone
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8848/nacos/v1/console/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+    restart: unless-stopped
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: shm-zipkin
+    ports:
+      - "9411:9411"
+    restart: unless-stopped
+
+  core-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: core-service
+    container_name: shm-core-service
+    ports:
+      - "8081:8081"
+    env_file: .env
+    environment:
+      JAVA_TOOL_OPTIONS: -Dcsp.sentinel.log.dir=/tmp
+      DB_URL: jdbc:mysql://host.docker.internal:3306/campus_market_dev?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+      REDIS_HOST: redis
+      NACOS_SERVER_ADDR: nacos:8848
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    depends_on:
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    restart: unless-stopped
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: admin-service
+    container_name: shm-admin-service
+    ports:
+      - "8082:8082"
+    env_file: .env
+    environment:
+      JAVA_TOOL_OPTIONS: -Dcsp.sentinel.log.dir=/tmp
+      DB_URL: jdbc:mysql://host.docker.internal:3306/campus_market_dev?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+      NACOS_SERVER_ADDR: nacos:8848
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    depends_on:
+      nacos:
+        condition: service_healthy
+      core-service:
+        condition: service_started
+    restart: unless-stopped
+
+  im-connector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: im-connector
+    container_name: shm-im-connector
+    ports:
+      - "8083:8083"
+    env_file: .env
+    volumes:
+      - ../server/public/images:/app/images:rw
+    environment:
+      JAVA_TOOL_OPTIONS: -Dcsp.sentinel.log.dir=/tmp
+      IMAGE_STORAGE_PATH: /app/images
+      NACOS_SERVER_ADDR: nacos:8848
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    depends_on:
+      nacos:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: gateway
+    container_name: shm-gateway
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      JAVA_TOOL_OPTIONS: -Dcsp.sentinel.log.dir=/tmp
+      NACOS_SERVER_ADDR: nacos:8848
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    depends_on:
+      nacos:
+        condition: service_healthy
+      core-service:
+        condition: service_started
+      admin-service:
+        condition: service_started
+      im-connector:
+        condition: service_started
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: shm-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus-docker.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: shm-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./grafana-dashboard.json:/var/lib/grafana/dashboards/shm-dashboard.json:ro
+      - ./grafana-dashboard-provider.yml:/etc/grafana/provisioning/dashboards/provider.yml:ro
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  grafana-data:

@@ -53,13 +53,39 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
-# ── Sentinel 熔断 (Phase 9) ──
+# ── Sentinel 熔断 (Phase 9 + Phase 17 补全) ──
 spring.cloud.sentinel:
   transport:
     dashboard: ${SENTINEL_DASHBOARD:localhost:8088}
     port: 8722
     client-ip: 127.0.0.1
   eager: true
+  # 启用 Web MVC 拦截器（Phase 17: 使 SentinelOriginConfig 生效）
+  filter:
+    enabled: true
+  datasource:
+    flow:
+      nacos:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        data-id: sentinel-admin-flow-rules
+        group-id: DEFAULT_GROUP
+        data-type: json
+        rule-type: flow
+    degrade:
+      nacos:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        data-id: sentinel-admin-degrade-rules
+        group-id: DEFAULT_GROUP
+        data-type: json
+        rule-type: degrade
+    # 授权规则（Phase 17: admin 白名单）
+    authority:
+      nacos:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        data-id: sentinel-admin-auth-rules
+        group-id: DEFAULT_GROUP
+        data-type: json
+        rule-type: authority
 
 # ── SpringDoc OpenAPI (Phase 12) ──
 springdoc:
@@ -96,3 +122,31 @@ seata:
       report-success-enable: false
     tm:
       degrade-check-allow-times: 10
+
+# ── RocketMQ 消息驱动 (Phase 14) ──
+rocketmq:
+  enabled: ${ROCKETMQ_ENABLED:false}
+  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+  producer:
+    group: ${ROCKETMQ_PRODUCER_GROUP:shm-admin-producer}
+  consumer:
+    group: ${ROCKETMQ_CONSUMER_GROUP:shm-admin-consumer}
+
+# ── 全链路追踪（Phase 15）+ 监控指标（Prometheus）──
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}

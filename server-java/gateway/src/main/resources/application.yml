@@ -130,8 +130,8 @@ spring:
 
 # ── JWT 配置（仅 Access Token 验证，Refresh Token 由 core-service 处理） ──
 jwt:
-  access-secret: ${JWT_ACCESS_SECRET:}
-  refresh-secret: ${JWT_REFRESH_SECRET:}
+  access-secret: ${JWT_ACCESS_SECRET}
+  refresh-secret: ${JWT_REFRESH_SECRET}
 
 # ── 日志（DEBUG + 文件输出） ──
 logging:
@@ -194,3 +194,22 @@ spring.cloud.sentinel:
         group-id: DEFAULT_GROUP
         data-type: json
         rule-type: gw-api-group
+
+# ── 全链路追踪（Phase 15）+ 监控指标（Prometheus）──
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}

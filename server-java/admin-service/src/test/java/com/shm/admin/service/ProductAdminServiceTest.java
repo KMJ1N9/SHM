@@ -1,8 +1,8 @@
 package com.shm.admin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shm.admin.feign.ImConnectorFeign;
 import com.shm.admin.mapper.AdminLogMapper;
+import com.shm.admin.mq.ReportEventPublisher;
 import com.shm.admin.mapper.ProductMapper;
 import com.shm.common.exception.BusinessException;
 import com.shm.common.exception.ErrorCode;
@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -36,7 +37,7 @@ class ProductAdminServiceTest {
     @Mock
     private AdminLogMapper adminLogMapper;
     @Mock
-    private ImConnectorFeign imConnectorFeign;
+    private ReportEventPublisher reportEventPublisher;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -45,7 +46,10 @@ class ProductAdminServiceTest {
     @BeforeEach
     void setUp() {
         productAdminService = new ProductAdminService(productMapper, adminLogMapper,
-                objectMapper, imConnectorFeign);
+                objectMapper,
+                new ObjectProvider<ReportEventPublisher>() {
+                    @Override public ReportEventPublisher getObject() { return reportEventPublisher; }
+                });
     }
 
     // ============================================================
@@ -138,9 +142,8 @@ class ProductAdminServiceTest {
         when(productMapper.findById(1L)).thenReturn(product)
                 .thenReturn(updated);
 
-        // IM 推送成功
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), contains("iPhone"), isNull()))
-                .thenReturn(Map.of("code", 0));
+        // MQ 发布（默认不抛出异常）
+        doNothing().when(reportEventPublisher).publishReportEvent(any());
 
         Map<String, Object> result = productAdminService.offShelfProduct(1L, 1L);
 
@@ -168,9 +171,8 @@ class ProductAdminServiceTest {
         when(productMapper.findById(1L)).thenReturn(product)
                 .thenReturn(updated);
 
-        // IM 推送抛出异常（应被静默捕获）
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenThrow(new RuntimeException("IM 服务不可用"));
+        // MQ 发布抛出异常（应被静默捕获）
+        doThrow(new RuntimeException("IM 服务不可用")).when(reportEventPublisher).publishReportEvent(any());
 
         // 不应抛出异常，事务继续
         Map<String, Object> result = productAdminService.offShelfProduct(1L, 1L);

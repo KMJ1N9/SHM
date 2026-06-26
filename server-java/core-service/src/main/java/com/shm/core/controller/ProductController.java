@@ -33,7 +33,9 @@ public class ProductController {
     /**
      * GET /api/products — 商品列表（高频接口）
      */
-    @SentinelResource(value = "product-list")
+    @SentinelResource(value = "product-list",
+            blockHandler = "handleBlock", blockHandlerClass = com.shm.common.sentinel.GlobalBlockHandler.class,
+            fallback = "handleFallback", fallbackClass = com.shm.common.sentinel.GlobalFallback.class)
     @GetMapping
     public Map<String, Object> list(@RequestParam(defaultValue = "1") int page,
                                      @RequestParam(defaultValue = "20") int pageSize,
@@ -70,7 +72,9 @@ public class ProductController {
     /**
      * GET /api/products/:id — 商品详情（高频接口）
      */
-    @SentinelResource(value = "product-detail")
+    @SentinelResource(value = "product-detail",
+            blockHandler = "productDetailBlock", blockHandlerClass = com.shm.common.sentinel.GlobalBlockHandler.class,
+            fallback = "handleFallback", fallbackClass = com.shm.common.sentinel.GlobalFallback.class)
     @GetMapping("/{id}")
     public Map<String, Object> detail(@PathVariable Long id, @CurrentUser UserPrincipal user) {
         return ResponseBuilder.ok(productService.detail(id, user.getUserId(), user.getRole()));

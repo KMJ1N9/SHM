@@ -1,0 +1,38 @@
+# ── 校园二手交易平台 — 快速启动 ──
+
+## 前置条件
+- 本地 MySQL 已启动（端口 3306）
+- Docker Desktop 已启动（右下角鲸鱼图标变绿）
+
+## 前端
+cd miniprogram
+npm run dev:mp-weixin
+# 在微信开发者工具打开 miniprogram/dist/dev/mp-weixin/
+
+## Java 后端 — Docker 一键启动
+cd server-java
+docker compose up -d
+
+## 关闭
+docker compose down
+
+# 改代码后重新部署
+mvn -pl gateway,core-service,admin-service,im-connector package spring-boot:repackage -DskipTests -amd
+docker compose up -d --build
+
+## Node.js 后端（备用）
+cd server
+npm run dev
+# 前端 API 切到 http://localhost:3000
+
+## 架构
+Docker: Nacos + Redis + 4个Java服务 + Zipkin + Prometheus + Grafana
+本地:  MySQL（数据持久化，不受Docker影响）
+
+## 访问地址
+http://localhost:8080                     API 入口
+http://localhost:8080/api/health          聚合健康检查
+http://localhost:8080/swagger-ui.html     API 文档
+http://localhost:3001                     Grafana 监控 (admin/admin)
+http://localhost:9090/targets             Prometheus
+http://localhost:9411                     Zipkin 链路追踪

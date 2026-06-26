@@ -30,7 +30,9 @@ public class OrderController {
     /**
      * POST /api/orders — 创建订单（高频写入接口）
      */
-    @SentinelResource(value = "order-create")
+    @SentinelResource(value = "order-create",
+            blockHandler = "handleBlock", blockHandlerClass = com.shm.common.sentinel.GlobalBlockHandler.class,
+            fallback = "handleFallback", fallbackClass = com.shm.common.sentinel.GlobalFallback.class)
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> create(@CurrentUser UserPrincipal user,
@@ -41,7 +43,9 @@ public class OrderController {
     /**
      * GET /api/orders — 我的订单列表（高频读取接口）
      */
-    @SentinelResource(value = "order-list")
+    @SentinelResource(value = "order-list",
+            blockHandler = "handleBlock", blockHandlerClass = com.shm.common.sentinel.GlobalBlockHandler.class,
+            fallback = "handleFallback", fallbackClass = com.shm.common.sentinel.GlobalFallback.class)
     @GetMapping
     public Map<String, Object> list(@CurrentUser UserPrincipal user,
                                     @RequestParam(defaultValue = "both") String role,

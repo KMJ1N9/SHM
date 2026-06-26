@@ -65,6 +65,7 @@ public class JwtAuthGatewayFilter implements WebFilter, Ordered {
     private static final List<String> PREFIX_WHITELIST = List.of(
             "/images/",
             "/internal/",   // 内部微服务 API（使用 X-Internal-Token，非 JWT）
+            "/actuator/",   // Actuator 端点（Prometheus 指标、健康检查等）
             "/swagger-ui.html",
             "/swagger-ui/",
             "/v3/api-docs/",

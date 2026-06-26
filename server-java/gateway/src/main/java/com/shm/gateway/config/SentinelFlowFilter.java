@@ -4,8 +4,10 @@ import com.alibaba.csp.sentinel.Entry;
 import com.alibaba.csp.sentinel.EntryType;
 import com.alibaba.csp.sentinel.SphU;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
+import io.micrometer.tracing.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
@@ -40,6 +42,13 @@ import java.util.Set;
 public class SentinelFlowFilter implements WebFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(SentinelFlowFilter.class);
+
+    /** Tracing（Phase 15）— 可选注入，Tracing 未配置时为 null */
+    private final Tracer tracer;
+
+    public SentinelFlowFilter(ObjectProvider<Tracer> tracerProvider) {
+        this.tracer = tracerProvider.getIfAvailable();
+    }
 
     /** 敏感 API 资源名 — Nacos 中配置 QPS=10（引用共享常量） */
     static final String RESOURCE_SENSITIVE = SentinelConstants.RESOURCE_SENSITIVE;
@@ -105,8 +114,10 @@ public class SentinelFlowFilter implements WebFilter, Ordered {
             return chain.filter(exchange)
                     .doFinally(signal -> entry.exit());
         } catch (BlockException e) {
-            log.debug("[Sentinel] 限流触发: resource={}, path={}",
-                    resource, exchange.getRequest().getURI().getPath());
+            String traceId = tracer != null && tracer.currentSpan() != null
+                    ? tracer.currentSpan().context().traceId() : "-";
+            log.debug("[Sentinel] 限流触发: resource={}, path={}, traceId={}",
+                    resource, exchange.getRequest().getURI().getPath(), traceId);
             return blockResponse(exchange);
         }
     }

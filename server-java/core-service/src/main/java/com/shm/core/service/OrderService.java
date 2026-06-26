@@ -11,10 +11,11 @@ import com.shm.common.model.entity.Order;
 import com.shm.common.model.entity.Product;
 import com.shm.common.model.entity.User;
 import com.shm.common.model.dto.admin.AdminLogRequest;
+import com.shm.common.model.dto.message.OrderEventMessage;
 import com.shm.core.config.CreditProperties;
 import com.shm.core.feign.AdminLogFeign;
-import com.shm.core.feign.ImConnectorFeign;
 import com.shm.core.lock.DistributedLocker;
+import com.shm.core.mq.OrderEventPublisher;
 import com.shm.core.repository.NotificationRepository;
 import com.shm.core.repository.OrderRepository;
 import com.shm.core.repository.ProductRepository;
@@ -23,6 +24,7 @@ import io.seata.spring.annotation.GlobalTransactional;
 import org.redisson.api.RLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,7 +58,7 @@ public class OrderService {
     private final NotificationRepository notificationRepo;
     private final ObjectMapper objectMapper;
     private final CreditProperties creditProps;
-    private final ImConnectorFeign imConnectorFeign;
+    private final ObjectProvider<OrderEventPublisher> orderEventPublisher;
     private final DistributedLocker distributedLocker;
     private final AdminLogFeign adminLogFeign;
 
@@ -66,7 +68,7 @@ public class OrderService {
     public OrderService(OrderRepository orderRepo, ProductRepository productRepo,
                         UserRepository userRepo, NotificationRepository notificationRepo,
                         ObjectMapper objectMapper, CreditProperties creditProps,
-                        ImConnectorFeign imConnectorFeign, DistributedLocker distributedLocker,
+                        ObjectProvider<OrderEventPublisher> orderEventPublisher, DistributedLocker distributedLocker,
                         AdminLogFeign adminLogFeign) {
         this.orderRepo = orderRepo;
         this.productRepo = productRepo;
@@ -74,7 +76,7 @@ public class OrderService {
         this.notificationRepo = notificationRepo;
         this.objectMapper = objectMapper;
         this.creditProps = creditProps;
-        this.imConnectorFeign = imConnectorFeign;
+        this.orderEventPublisher = orderEventPublisher;
         this.distributedLocker = distributedLocker;
         this.adminLogFeign = adminLogFeign;
     }
@@ -526,21 +528,20 @@ public class OrderService {
         notificationRepo.insert(notification);
         log.info("站内通知已写入: userId={}, type={}, orderId={}", userId, type, orderId);
 
-        // 2. 通过 Feign 推送 IM 实时消息（静默失败，不影响事务）
+        // 2. 通过 RocketMQ 异步推送 IM 实时消息（由 ImPushOrderConsumer 消费）
         try {
-            Map<String, Object> imResult = imConnectorFeign.sendSystemMessage(
-                    String.valueOf(userId), title, content, orderId);
-            if (imResult != null && imResult.containsKey("code")) {
-                int code = ((Number) imResult.get("code")).intValue();
-                if (code != 0) {
-                    log.warn("IM 推送失败: userId={}, code={}, message={}", userId, code, imResult.get("message"));
-                } else {
-                    log.debug("IM 推送成功: userId={}, orderId={}", userId, orderId);
-                }
-            }
+            OrderEventMessage event = OrderEventMessage.builder()
+                    .orderId(orderId)
+                    .type(type)
+                    .title(title)
+                    .content(content)
+                    .targetUid(String.valueOf(userId))
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            orderEventPublisher.ifAvailable(p -> p.publishOrderEvent(event));
         } catch (Exception e) {
-            // IM 服务不可用时静默降级——站内通知已写入，用户下次打开小程序可见
-            log.warn("IM 推送异常（已降级为站内通知）: userId={}, error={}", userId, e.getMessage());
+            // MQ 不可用时静默降级——站内通知已写入，用户下次打开小程序可见
+            log.warn("订单事件发布异常（已降级为站内通知）: userId={}, error={}", userId, e.getMessage());
         }
     }
 }

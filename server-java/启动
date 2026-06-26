@@ -10,7 +10,6 @@ set -a && source .env && set +a
 
 2. 启动 Nacos
 startup.cmd -m standalone
-等待 15-20 秒，验证：curl http://localhost:8848/nacos/（出现 HTML 即成功）
 
 3. 重新编译（应用本次修改）
 cd "d:\学习资料\AI AGENT\项目\SHM\server-java"
@@ -40,6 +39,8 @@ npm run dev:mp-weixin
 
 7. 微信开发者工具设置
 导入目录选 D:\学习资料\AI AGENT\项目\SHM\miniprogram\dist\dev\mp-weixin
-AppID：wx0c4d54c24d540539
+AppID：见 .env 文件
 详情 → 本地设置 → 勾选 "不校验合法域名"
 先模拟器验证首页能加载商品列表，再点真机调试
+
+http://localhost:8080/webjars/swagger-ui/index.html

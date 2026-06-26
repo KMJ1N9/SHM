@@ -1,8 +1,11 @@
 package com.shm.admin.controller;
 
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.shm.admin.security.CurrentUser;
 import com.shm.admin.security.UserPrincipal;
 import com.shm.admin.service.UserAdminService;
+import com.shm.common.sentinel.GlobalBlockHandler;
+import com.shm.common.sentinel.GlobalFallback;
 import com.shm.common.util.ResponseBuilder;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +29,9 @@ public class UserAdminController {
     /**
      * GET /api/admin/users — 用户列表
      */
+    @SentinelResource(value = "admin-users",
+            blockHandler = "handleBlock", blockHandlerClass = GlobalBlockHandler.class,
+            fallback = "handleFallback", fallbackClass = GlobalFallback.class)
     @GetMapping
     public Map<String, Object> list(@RequestParam(required = false) String keyword,
                                      @RequestParam(required = false) String status,

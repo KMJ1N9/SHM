@@ -56,5 +56,11 @@
             <artifactId>jjwt-jackson</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- Sentinel Core（Phase 17: GlobalBlockHandler/GlobalFallback 需要引用 BlockException） -->
+        <dependency>
+            <groupId>com.alibaba.csp</groupId>
+            <artifactId>sentinel-core</artifactId>
+        </dependency>
     </dependencies>
 </project>

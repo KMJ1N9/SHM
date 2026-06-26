@@ -2,8 +2,8 @@ package com.shm.admin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shm.admin.feign.CoreUserFeign;
-import com.shm.admin.feign.ImConnectorFeign;
 import com.shm.admin.mapper.AdminLogMapper;
+import com.shm.admin.mq.ReportEventPublisher;
 import com.shm.admin.mapper.NotificationMapper;
 import com.shm.admin.mapper.ReportMapper;
 import com.shm.admin.mapper.UserMapper;
@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,7 +44,7 @@ class ReportAdminServiceTest {
     @Mock
     private AdminLogMapper adminLogMapper;
     @Mock
-    private ImConnectorFeign imConnectorFeign;
+    private ReportEventPublisher reportEventPublisher;
     @Mock
     private CoreUserFeign coreUserFeign;
 
@@ -55,7 +56,10 @@ class ReportAdminServiceTest {
     void setUp() {
         reportAdminService = new ReportAdminService(reportMapper, userMapper,
                 notificationMapper, adminLogMapper, objectMapper,
-                imConnectorFeign, coreUserFeign);
+                new ObjectProvider<ReportEventPublisher>() {
+                    @Override public ReportEventPublisher getObject() { return reportEventPublisher; }
+                },
+                coreUserFeign);
     }
 
     // ============================================================
@@ -153,8 +157,7 @@ class ReportAdminServiceTest {
         when(reportMapper.findDetailById(1L)).thenReturn(detail);
 
         // IM 推送正常（举报人 + 被举报人各一条）
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        doNothing().when(reportEventPublisher).publishReportEvent(any());
 
         Map<String, Object> result = reportAdminService.resolveTicket(1L, 1L,
                 "情况说明，不做处罚", "none", 0);
@@ -184,8 +187,7 @@ class ReportAdminServiceTest {
         Map<String, Object> detail = Map.of("id", 1L, "status", "resolved");
         when(reportMapper.findDetailById(1L)).thenReturn(detail);
 
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        doNothing().when(reportEventPublisher).publishReportEvent(any());
 
         Map<String, Object> result = reportAdminService.resolveTicket(1L, 1L,
                 "违规发布", "deduct_credit", 10);
@@ -215,8 +217,7 @@ class ReportAdminServiceTest {
         Map<String, Object> detail = Map.of("id", 1L, "status", "resolved");
         when(reportMapper.findDetailById(1L)).thenReturn(detail);
 
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenReturn(Map.of("code", 0));
+        doNothing().when(reportEventPublisher).publishReportEvent(any());
 
         Map<String, Object> result = reportAdminService.resolveTicket(1L, 1L,
                 "严重违规", "ban", 0);
@@ -271,8 +272,7 @@ class ReportAdminServiceTest {
         Map<String, Object> detail = Map.of("id", 1L, "status", "resolved");
         when(reportMapper.findDetailById(1L)).thenReturn(detail);
 
-        when(imConnectorFeign.sendSystemMessage(anyString(), anyString(), anyString(), any()))
-                .thenThrow(new RuntimeException("IM 服务不可用"));
+        doThrow(new RuntimeException("IM 服务不可用")).when(reportEventPublisher).publishReportEvent(any());
 
         // 不应抛出异常
         Map<String, Object> result = reportAdminService.resolveTicket(1L, 1L,

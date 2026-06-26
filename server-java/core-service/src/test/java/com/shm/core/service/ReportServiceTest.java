@@ -8,7 +8,7 @@ import com.shm.common.model.dto.report.CreateReportRequest;
 import com.shm.common.model.entity.Order;
 import com.shm.common.model.entity.Report;
 import com.shm.common.model.entity.User;
-import com.shm.core.feign.ImConnectorFeign;
+import com.shm.core.mq.OrderEventPublisher;
 import com.shm.core.repository.NotificationRepository;
 import com.shm.core.repository.OrderRepository;
 import com.shm.core.repository.ProductRepository;
@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Map;
@@ -46,7 +47,7 @@ class ReportServiceTest {
     @Mock
     private NotificationRepository notificationRepo;
     @Mock
-    private ImConnectorFeign imConnectorFeign;
+    private OrderEventPublisher orderEventPublisher;
 
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
@@ -56,7 +57,11 @@ class ReportServiceTest {
     @BeforeEach
     void setUp() {
         reportService = new ReportService(reportRepo, orderRepo, productRepo,
-                userRepo, notificationRepo, imConnectorFeign, objectMapper);
+                userRepo, notificationRepo,
+                new ObjectProvider<OrderEventPublisher>() {
+                    @Override public OrderEventPublisher getObject() { return orderEventPublisher; }
+                },
+                objectMapper);
         // 默认无管理员，避免 notifyAdmins 产生 NPE
         lenient().when(userRepo.findAdminUsers()).thenReturn(List.of());
     }
