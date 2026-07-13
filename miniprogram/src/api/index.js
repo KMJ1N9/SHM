@@ -15,15 +15,15 @@
 
 // ── 后端切换：注释掉当前行，取消注释目标行即可 ──────────────
 //
-// Node.js 后端 (端口 3000)：
-// const BASE_URL = 'http://localhost:3000/api';               // ← 模拟器
-// const BASE_URL = 'http://10.115.248.247:3000/api';        // ← 真机 (热点)
-// const BASE_URL = 'http://10.96.197.124:3000/api';          // ← 真机 (校园网)
+// Node.js 后端 (端口 3002)：
+// const BASE_URL = 'http://localhost:3002/api';               // ← 模拟器
+// const BASE_URL = 'http://10.48.108.247:3002/api';        // ← 真机 (热点)
+// const BASE_URL = 'http://10.96.197.124:3002/api';          // ← 真机 (校园网)
 //
 // Java 后端 (Gateway 端口 8080)：
 // const BASE_URL = 'http://localhost:8080/api';               // ← 模拟器
-   const BASE_URL = 'http://10.115.248.247:8080/api';          // ← 真机 (热点)
-// const BASE_URL = 'http://10.96.197.124:8080/api';           // ← 真机 (校园网)
+const BASE_URL = 'http://10.48.108.247:8080/api';          // ← 真机 (热点)
+// const BASE_URL = 'http://10.96.197.124:8080/api';         // ← 真机 (校园网)
 // ────────────────────────────────────────────────────────────────
 
 /** 图片服务器 origin，从 BASE_URL 派生 */

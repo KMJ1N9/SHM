@@ -146,6 +146,7 @@ const statusTabs = [
 function statusLabel(status) {
   const map = {
     pending: '待面交',
+    met_pending: '待确认面交',
     met: '已面交',
     completed: '已完成',
     cancelled: '已取消',

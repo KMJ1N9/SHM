@@ -21,8 +21,10 @@ public class Order {
     private Long buyerId;
     private Long sellerId;
     private String status;
-    /** 取消方：buyer / seller */
+    /** 取消方：buyer / seller / system */
     private String cancelledBy;
+    /** 面交发起方 userId（met_pending 状态下记录） */
+    private Long metInitiatedBy;
     /** ${buyer_id}_${product_id}，防重复提交 */
     private String idempotentKey;
     /** JSON，交易时商品快照 */

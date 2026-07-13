@@ -33,7 +33,17 @@
         <button v-if="canCancel" class="action-btn action-btn--secondary" @click="doCancel">
           取消订单
         </button>
-        <button v-if="canMarkMet" class="action-btn action-btn--primary" @click="doMarkMet">
+        <!-- met_pending: 等待对方确认中（当前用户是发起方） -->
+        <view v-if="canCancelMetPending" class="met-pending-hint">
+          <text>等待对方确认面交...</text>
+          <text class="met-cancel-link" @click="doCancelMetPending">撤回</text>
+        </view>
+        <!-- met_pending: 需要确认（当前用户不是发起方） -->
+        <button v-if="canConfirmMet" class="action-btn action-btn--primary" @click="doConfirmMet">
+          确认面交
+        </button>
+        <!-- pending: 发起面交 -->
+        <button v-if="canInitiateMet" class="action-btn action-btn--primary" @click="doInitiateMet">
           标记面交
         </button>
         <button v-if="canConfirm" class="action-btn action-btn--primary" @click="doConfirm">
@@ -72,7 +82,7 @@
  */
 import { ref, computed } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
-import { getOrderDetail, markAsMet, confirmOrder, cancelOrder } from '@/api/order';
+import { getOrderDetail, initiateMet, confirmMet, cancelMetPending, confirmOrder, cancelOrder } from '@/api/order';
 import { getReviewsByOrder } from '@/api/review';
 import { useUserStore } from '@/store/user';
 import OrderTimeline from './components/OrderTimeline.vue';
@@ -86,6 +96,7 @@ import { useOrderActions } from './composables/useOrderActions.js';
 // ============================================================
 const STATUS = {
   PENDING: 'pending',
+  MET_PENDING: 'met_pending',
   MET: 'met',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
@@ -129,12 +140,26 @@ const canCancel = computed(() => {
   if (!order.value) return false;
   const status = order.value.status;
   if (status === STATUS.PENDING) return isBuyer.value || isSeller.value;
+  if (status === STATUS.MET_PENDING) return isBuyer.value || isSeller.value;
   if (status === STATUS.MET) return isBuyer.value;
   return false;
 });
 
-const canMarkMet = computed(() => {
+/** 发起面交：pending 状态双方均可发起 */
+const canInitiateMet = computed(() => {
   return order.value?.status === STATUS.PENDING && (isBuyer.value || isSeller.value);
+});
+
+/** 确认面交：met_pending 且当前用户不是发起方 */
+const canConfirmMet = computed(() => {
+  if (order.value?.status !== STATUS.MET_PENDING) return false;
+  return order.value.met_initiated_by !== myId.value;
+});
+
+/** 撤回面交：met_pending 且当前用户是发起方 */
+const canCancelMetPending = computed(() => {
+  if (order.value?.status !== STATUS.MET_PENDING) return false;
+  return order.value.met_initiated_by === myId.value;
 });
 
 const canConfirm = computed(() => {
@@ -212,11 +237,17 @@ function onReviewSubmitted(localReview) {
 // ============================================================
 // 操作处理（委托给 composable）
 // ============================================================
-const { handleMarkMet, handleConfirm, handleCancel, goReport } = useOrderActions();
+const { handleInitiateMet, handleConfirmMet, handleCancelMetPending, handleConfirm, handleCancel, goReport } = useOrderActions();
 
 /** 模板绑定的 wrapper — 注入运行时参数 */
-function doMarkMet() {
-  handleMarkMet(order.value.id, markAsMet, loadOrder);
+function doInitiateMet() {
+  handleInitiateMet(order.value.id, initiateMet, loadOrder);
+}
+function doConfirmMet() {
+  handleConfirmMet(order.value.id, confirmMet, loadOrder);
+}
+function doCancelMetPending() {
+  handleCancelMetPending(order.value.id, cancelMetPending, loadOrder);
 }
 function doConfirm() {
   handleConfirm(order.value.id, confirmOrder, loadOrder);
@@ -320,5 +351,21 @@ function doReport() {
     border: 1rpx solid $color-divider;
     font-size: $text-xs;
   }
+}
+
+// ── met_pending 等待确认 ──
+.met-pending-hint {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: $text-xs;
+  color: $color-muted;
+}
+
+.met-cancel-link {
+  color: $color-primary;
+  font-size: $text-xs;
+  margin-top: 4rpx;
 }
 </style>

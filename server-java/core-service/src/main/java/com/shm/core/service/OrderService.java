@@ -244,14 +244,20 @@ public class OrderService {
     }
 
     // ============================================================
-    // 标记面交
+    // 发起面交（双向确认机制第一步）
     // ============================================================
 
     /**
-     * 标记面交（与 Node.js orderService.markAsMet 一致）
+     * 发起面交确认（替代旧的单方面 markAsMet）
+     *
+     * <p>任一方发起后状态变为 {@code met_pending}，等待对方确认。
+     * 对方也调用此方法时自动转为双方确认，直接进入 {@code met}。
+     *
+     * @param orderId 订单 ID
+     * @param userId  当前用户 ID（买家或卖家）
      */
     @Transactional
-    public Map<String, Object> markAsMet(Long orderId, Long userId) {
+    public Map<String, Object> initiateMet(Long orderId, Long userId) {
         Order order = orderRepo.findByIdForUpdate(orderId);
         if (order == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "订单不存在");
@@ -259,26 +265,135 @@ public class OrderService {
         if (!order.getBuyerId().equals(userId) && !order.getSellerId().equals(userId)) {
             throw new BusinessException(ErrorCode.NOT_OWNER);
         }
+
+        // 如果状态已是 met_pending 且对方发起 → 直接确认（双方都点了面交）
+        if ("met_pending".equals(order.getStatus())) {
+            Long otherParty = order.getBuyerId().equals(userId) ? order.getSellerId() : order.getBuyerId();
+            if (order.getMetInitiatedBy() != null && order.getMetInitiatedBy().equals(otherParty)) {
+                log.info("双方均已发起面交，自动确认: orderId={}, userId={}", orderId, userId);
+                return confirmMetInternal(order, userId);
+            }
+            if (order.getMetInitiatedBy() != null && order.getMetInitiatedBy().equals(userId)) {
+                throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "你已发起过面交确认，请等待对方确认");
+            }
+        }
+
         if (!"pending".equals(order.getStatus())) {
-            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "仅待面交状态的订单可标记面交");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前订单状态不可发起面交");
         }
 
         Order update = Order.builder()
                 .id(orderId)
-                .status("met")
-                .metAt(LocalDateTime.now())
+                .status("met_pending")
+                .metInitiatedBy(userId)
                 .build();
         orderRepo.updateStatus(update);
 
-        log.info("面交确认: orderId={}, userId={}", orderId, userId);
+        log.info("面交发起: orderId={}, userId={}", orderId, userId);
 
-        // IM 通知：通知对方已确认面交
+        // IM 通知对方确认
         Long notifyTarget = order.getBuyerId().equals(userId) ? order.getSellerId() : order.getBuyerId();
-        notifyUser(notifyTarget, "order_update", "面交确认",
-                "对方已确认面交，请尽快完成交易", orderId);
+        notifyUser(notifyTarget, "order_update", "面交确认请求",
+                "对方已发起面交确认，请确认是否已面交", orderId);
 
         Order updated = orderRepo.findById(orderId);
         return toOrderMap(updated, fetchUsersForOrder(updated.getBuyerId(), updated.getSellerId()));
+    }
+
+    // ============================================================
+    // 确认面交（双向确认机制第二步）
+    // ============================================================
+
+    /**
+     * 确认面交 — 对方发起面交后，我方点击确认
+     */
+    @Transactional
+    public Map<String, Object> confirmMet(Long orderId, Long userId) {
+        Order order = orderRepo.findByIdForUpdate(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "订单不存在");
+        }
+        if (!order.getBuyerId().equals(userId) && !order.getSellerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NOT_OWNER);
+        }
+        if (!"met_pending".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "没有待确认的面交请求");
+        }
+        if (order.getMetInitiatedBy() != null && order.getMetInitiatedBy().equals(userId)) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "不能确认自己发起的请求，请等待对方确认");
+        }
+
+        return confirmMetInternal(order, userId);
+    }
+
+    /** 内部方法：执行面交确认（status → met） */
+    private Map<String, Object> confirmMetInternal(Order order, Long userId) {
+        Order update = Order.builder()
+                .id(order.getId())
+                .status("met")
+                .metAt(LocalDateTime.now())
+                .metInitiatedBy(null)  // 清空发起人标记
+                .build();
+        orderRepo.updateStatus(update);
+
+        log.info("面交确认完成: orderId={}, userId={}", order.getId(), userId);
+
+        // IM 通知发起方：对方已确认
+        notifyUser(userId, "order_update", "面交已确认",
+                "对方已确认面交，请尽快完成交易", order.getId());
+
+        Order updated = orderRepo.findById(order.getId());
+        return toOrderMap(updated, fetchUsersForOrder(updated.getBuyerId(), updated.getSellerId()));
+    }
+
+    // ============================================================
+    // 撤回面交发起
+    // ============================================================
+
+    /**
+     * 撤回面交发起 — 发起方将状态回退为 pending
+     */
+    @Transactional
+    public Map<String, Object> cancelMetPending(Long orderId, Long userId) {
+        Order order = orderRepo.findByIdForUpdate(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "订单不存在");
+        }
+        if (!"met_pending".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前订单状态不可撤回面交");
+        }
+        if (!userId.equals(order.getMetInitiatedBy())) {
+            throw new BusinessException(ErrorCode.NOT_OWNER, "仅发起方可撤回面交请求");
+        }
+
+        Order update = Order.builder()
+                .id(orderId)
+                .status("pending")
+                .metInitiatedBy(null)
+                .build();
+        orderRepo.updateStatus(update);
+
+        log.info("撤回面交发起: orderId={}, userId={}", orderId, userId);
+
+        Long notifyTarget = order.getBuyerId().equals(userId) ? order.getSellerId() : order.getBuyerId();
+        notifyUser(notifyTarget, "order_update", "面交请求已撤回",
+                "对方已撤回面交请求", orderId);
+
+        Order updated = orderRepo.findById(orderId);
+        return toOrderMap(updated, fetchUsersForOrder(updated.getBuyerId(), updated.getSellerId()));
+    }
+
+    // ============================================================
+    // 标记面交（兼容旧 API，重定向到 initiateMet）
+    // ============================================================
+
+    /**
+     * @deprecated 使用 {@link #initiateMet(Long, Long)} 替代
+     */
+    @Deprecated
+    @Transactional
+    public Map<String, Object> markAsMet(Long orderId, Long userId) {
+        return initiateMet(orderId, userId);
     }
 
     // ============================================================
@@ -382,7 +497,7 @@ public class OrderService {
 
         // 确定取消方
         String cancelledBy;
-        if ("pending".equals(order.getStatus())) {
+        if ("pending".equals(order.getStatus()) || "met_pending".equals(order.getStatus())) {
             cancelledBy = isBuyer ? "buyer" : "seller";
         } else if ("met".equals(order.getStatus()) && isBuyer) {
             cancelledBy = "buyer";

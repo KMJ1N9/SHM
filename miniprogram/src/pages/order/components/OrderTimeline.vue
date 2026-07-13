@@ -12,8 +12,17 @@
           <text class="tl-time">{{ formatDateTime(order.created_at) }}</text>
         </view>
       </view>
-      <!-- 节点 2：已面交 -->
+      <!-- 节点 2：待确认面交 -->
       <view class="tl-node" :class="{ 'tl-node--active': timelineActive(1) }">
+        <view class="tl-dot" />
+        <view class="tl-content">
+          <text class="tl-label">待确认面交</text>
+          <text v-if="order.status === STATUS.MET_PENDING" class="tl-time tl-time--pending">等待对方确认</text>
+          <text v-else class="tl-time tl-time--pending">待完成</text>
+        </view>
+      </view>
+      <!-- 节点 3：已面交 -->
+      <view class="tl-node" :class="{ 'tl-node--active': timelineActive(2) }">
         <view class="tl-dot" />
         <view class="tl-content">
           <text class="tl-label">已面交</text>
@@ -21,8 +30,8 @@
           <text v-else class="tl-time tl-time--pending">待完成</text>
         </view>
       </view>
-      <!-- 节点 3：已确认收货 -->
-      <view class="tl-node" :class="{ 'tl-node--active': timelineActive(2) }">
+      <!-- 节点 4：已确认收货 -->
+      <view class="tl-node" :class="{ 'tl-node--active': timelineActive(3) }">
         <view class="tl-dot" />
         <view class="tl-content">
           <text class="tl-label">已确认收货</text>
@@ -30,8 +39,8 @@
           <text v-else class="tl-time tl-time--pending">待完成</text>
         </view>
       </view>
-      <!-- 节点 4：已评价 -->
-      <view class="tl-node" :class="{ 'tl-node--active': timelineActive(3) }">
+      <!-- 节点 5：已评价 -->
+      <view class="tl-node" :class="{ 'tl-node--active': timelineActive(4) }">
         <view class="tl-dot" />
         <view class="tl-content">
           <text class="tl-label">{{ reviewCompletion.label }}</text>
@@ -54,8 +63,10 @@ const props = defineProps({
 
 const STATUS = {
   PENDING: 'pending',
+  MET_PENDING: 'met_pending',
   MET: 'met',
   COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
 };
 
 /** 双方互评完成度 */
@@ -71,10 +82,11 @@ function timelineActive(nodeIndex) {
   const order = props.order;
   if (!order) return false;
   const status = order.status;
-  if (nodeIndex === 0) return true;
-  if (nodeIndex === 1) return status === STATUS.MET || status === STATUS.COMPLETED;
-  if (nodeIndex === 2) return status === STATUS.COMPLETED;
-  if (nodeIndex === 3) return reviewCompletion.value.active;
+  if (nodeIndex === 0) return true; // 已下单 — 始终激活
+  if (nodeIndex === 1) return status === STATUS.MET_PENDING || status === STATUS.MET || status === STATUS.COMPLETED; // 待确认面交
+  if (nodeIndex === 2) return status === STATUS.MET || status === STATUS.COMPLETED; // 已面交
+  if (nodeIndex === 3) return status === STATUS.COMPLETED; // 已确认收货
+  if (nodeIndex === 4) return reviewCompletion.value.active; // 已评价
   return false;
 }
 </script>

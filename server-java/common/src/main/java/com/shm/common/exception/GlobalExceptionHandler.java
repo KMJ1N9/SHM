@@ -71,13 +71,16 @@ public class GlobalExceptionHandler {
                         "服务内部错误", detail));
     }
 
-    /** 将业务错误码映射到 HTTP 状态码 */
+    /**
+     * 将业务错误码映射到 HTTP 状态码。
+     *
+     * <p>项目 API 约定统一返回 HTTP 200，通过 body.code 区分错误类型。
+     * 非 200 状态码会导致前端控制台出现红色报错（如 409 Conflict），
+     * 且前端拦截器仅依赖 body.code 而非 HTTP status，故此处始终返回 200。
+     * 仅未知异常（5000+ 及兜底）保留 500 以便监控告警。
+     */
     private HttpStatus mapHttpStatus(int code) {
-        if (code >= 1000 && code < 2000) return HttpStatus.UNAUTHORIZED;
-        if (code >= 2000 && code < 3000) return HttpStatus.NOT_FOUND;
-        if (code >= 3000 && code < 4000) return HttpStatus.CONFLICT;
-        if (code >= 4000 && code < 5000) return HttpStatus.BAD_REQUEST;
-        if (code >= 5000 && code < 6000) return HttpStatus.FORBIDDEN;
-        return HttpStatus.INTERNAL_SERVER_ERROR;
+        if (code >= 5000) return HttpStatus.INTERNAL_SERVER_ERROR;
+        return HttpStatus.OK;
     }
 }

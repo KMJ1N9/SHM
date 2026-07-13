@@ -11,11 +11,11 @@ import java.util.List;
 @Mapper
 public interface OrderMapper {
 
-    @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE id = #{id}")
+    @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, met_initiated_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE id = #{id}")
     Order findById(Long id);
 
     /** 带悲观锁查询（用于 confirmOrder/cancelOrder 防并发） */
-    @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE id = #{id} FOR UPDATE")
+    @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, met_initiated_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE id = #{id} FOR UPDATE")
     Order findByIdForUpdate(Long id);
 
     @Insert("INSERT INTO orders (product_id, buyer_id, seller_id, status, idempotent_key, product_snapshot) " +
@@ -23,7 +23,7 @@ public interface OrderMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Order order);
 
-    @Update("UPDATE orders SET status = #{status}, cancelled_by = #{cancelledBy}, met_at = #{metAt}, confirmed_at = #{confirmedAt} WHERE id = #{id}")
+    @Update("UPDATE orders SET status = #{status}, cancelled_by = #{cancelledBy}, met_initiated_by = #{metInitiatedBy}, met_at = #{metAt}, confirmed_at = #{confirmedAt} WHERE id = #{id}")
     int updateStatus(Order order);
 
     @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE idempotent_key = #{key}")
@@ -43,7 +43,7 @@ public interface OrderMapper {
     /**
      * 查询超时未处理的 pending 订单（Phase 14: 订单超时自动取消）
      */
-    @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE status = 'pending' AND created_at < #{cutoff}")
+    @Select("SELECT id, product_id, buyer_id, seller_id, status, cancelled_by, met_initiated_by, idempotent_key, product_snapshot, met_at, confirmed_at, created_at, updated_at FROM orders WHERE status IN ('pending','met_pending') AND created_at < #{cutoff}")
     List<Order> selectPendingOlderThan(@Param("cutoff") java.time.LocalDateTime cutoff);
 
     /**

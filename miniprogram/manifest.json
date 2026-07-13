@@ -14,6 +14,7 @@
       "minified": true
     },
     "usingComponents": true,
+    "lazyCodeLoading": "requiredComponents",
     "permission": {},
     "requiredPrivateInfos": ["getPhoneNumber"]
   }

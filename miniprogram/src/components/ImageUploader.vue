@@ -117,10 +117,18 @@ function handleChoose() {
       const valid = res.tempFiles.filter(
         (f) => isValidImage(f) && f.size <= MAX_SIZE
       );
-      const rejected = res.tempFiles.length - valid.length;
-      if (rejected > 0) {
+      const overSize = res.tempFiles.filter((f) => isValidImage(f) && f.size > MAX_SIZE);
+      const badFormat = res.tempFiles.filter((f) => !isValidImage(f));
+      if (overSize.length > 0) {
+        const sizeMB = (MAX_SIZE / 1024 / 1024).toFixed(0);
         uni.showToast({
-          title: `已自动过滤 ${rejected} 张不支持的图片`,
+          title: `图片不能超过${sizeMB}MB，已过滤${overSize.length}张`,
+          icon: 'none',
+          duration: 2500,
+        });
+      } else if (badFormat.length > 0) {
+        uni.showToast({
+          title: `不支持该格式，已过滤${badFormat.length}张`,
           icon: 'none',
           duration: 2000,
         });

@@ -53,13 +53,32 @@ export function getOrderDetail(id) {
 }
 
 /**
- * 标记面交（买方或卖方任一方点击"已面交"）
- * 仅 pending 状态可操作，操作后订单状态变为 met
+ * 发起面交确认（双向确认第一步，替代旧 markAsMet）
+ * 仅 pending 状态可操作，操作后订单状态变为 met_pending
  * @param {number} id - 订单 ID
  * @returns {Promise<Object>}
  */
-export function markAsMet(id) {
-  return put(`/orders/${id}/met`);
+export function initiateMet(id) {
+  return put(`/orders/${id}/met/initiate`);
+}
+
+/**
+ * 确认面交（双向确认第二步 — 对方发起后我方确认）
+ * 仅 met_pending 状态可操作，操作后订单状态变为 met
+ * @param {number} id - 订单 ID
+ * @returns {Promise<Object>}
+ */
+export function confirmMet(id) {
+  return put(`/orders/${id}/met/confirm`);
+}
+
+/**
+ * 撤回面交发起（仅发起方可操作）
+ * @param {number} id - 订单 ID
+ * @returns {Promise<Object>}
+ */
+export function cancelMetPending(id) {
+  return put(`/orders/${id}/met/cancel`);
 }
 
 /**

@@ -65,11 +65,35 @@ public class OrderController {
     }
 
     /**
-     * PUT /api/orders/:id/met — 标记面交
+     * PUT /api/orders/:id/met — 标记面交（保留兼容，内部重定向到 initiateMet）
      */
     @PutMapping("/{id}/met")
     public Map<String, Object> markAsMet(@PathVariable Long id, @CurrentUser UserPrincipal user) {
-        return ResponseBuilder.ok(orderService.markAsMet(id, user.getUserId()));
+        return ResponseBuilder.ok(orderService.initiateMet(id, user.getUserId()));
+    }
+
+    /**
+     * PUT /api/orders/:id/met/initiate — 发起面交确认
+     */
+    @PutMapping("/{id}/met/initiate")
+    public Map<String, Object> initiateMet(@PathVariable Long id, @CurrentUser UserPrincipal user) {
+        return ResponseBuilder.ok(orderService.initiateMet(id, user.getUserId()));
+    }
+
+    /**
+     * PUT /api/orders/:id/met/confirm — 确认面交（对方发起后我方确认）
+     */
+    @PutMapping("/{id}/met/confirm")
+    public Map<String, Object> confirmMet(@PathVariable Long id, @CurrentUser UserPrincipal user) {
+        return ResponseBuilder.ok(orderService.confirmMet(id, user.getUserId()));
+    }
+
+    /**
+     * PUT /api/orders/:id/met/cancel — 撤回面交发起
+     */
+    @PutMapping("/{id}/met/cancel")
+    public Map<String, Object> cancelMetPending(@PathVariable Long id, @CurrentUser UserPrincipal user) {
+        return ResponseBuilder.ok(orderService.cancelMetPending(id, user.getUserId()));
     }
 
     /**

@@ -6,20 +6,38 @@
  */
 export function useOrderActions() {
   /**
-   * 标记面交
-   * @param {number} orderId
-   * @param {Function} markAsMet
-   * @param {Function} loadOrder
+   * 发起面交（双向确认第一步）
    */
-  async function handleMarkMet(orderId, markAsMet, loadOrder) {
+  async function handleInitiateMet(orderId, initiateMet, loadOrder) {
     const { confirm } = await uni.showModal({
-      title: '确认面交',
-      content: '确认已与对方完成面交？',
+      title: '发起面交确认',
+      content: '确认已与对方完成面交？发起后需对方也确认。',
     });
     if (!confirm) return;
     uni.showLoading({ title: '操作中...', mask: true });
     try {
-      await markAsMet(orderId);
+      await initiateMet(orderId);
+      uni.hideLoading();
+      uni.showToast({ title: '已发起面交，等待对方确认', icon: 'success' });
+      await loadOrder();
+    } catch (err) {
+      uni.hideLoading();
+      uni.showToast({ title: err.message || '操作失败', icon: 'error' });
+    }
+  }
+
+  /**
+   * 确认面交（双向确认第二步）
+   */
+  async function handleConfirmMet(orderId, confirmMet, loadOrder) {
+    const { confirm } = await uni.showModal({
+      title: '确认面交',
+      content: '对方已发起面交确认，你是否确认已完成面交？',
+    });
+    if (!confirm) return;
+    uni.showLoading({ title: '操作中...', mask: true });
+    try {
+      await confirmMet(orderId);
       uni.hideLoading();
       uni.showToast({ title: '已确认面交', icon: 'success' });
       await loadOrder();
@@ -30,10 +48,28 @@ export function useOrderActions() {
   }
 
   /**
+   * 撤回面交发起
+   */
+  async function handleCancelMetPending(orderId, cancelMetPending, loadOrder) {
+    const { confirm } = await uni.showModal({
+      title: '撤回面交',
+      content: '确认撤回面交请求？',
+    });
+    if (!confirm) return;
+    uni.showLoading({ title: '操作中...', mask: true });
+    try {
+      await cancelMetPending(orderId);
+      uni.hideLoading();
+      uni.showToast({ title: '已撤回', icon: 'success' });
+      await loadOrder();
+    } catch (err) {
+      uni.hideLoading();
+      uni.showToast({ title: err.message || '操作失败', icon: 'error' });
+    }
+  }
+
+  /**
    * 确认收货
-   * @param {number} orderId
-   * @param {Function} confirmOrder
-   * @param {Function} loadOrder
    */
   async function handleConfirm(orderId, confirmOrder, loadOrder) {
     const { confirm } = await uni.showModal({
@@ -55,9 +91,6 @@ export function useOrderActions() {
 
   /**
    * 取消订单
-   * @param {number} orderId
-   * @param {Function} cancelOrder
-   * @param {Function} loadOrder
    */
   async function handleCancel(orderId, cancelOrder, loadOrder) {
     const { confirm } = await uni.showModal({
@@ -78,10 +111,7 @@ export function useOrderActions() {
   }
 
   /**
-   * 举报交易对方 — 构造参数并跳转
-   * @param {Object} order
-   * @param {boolean} isBuyer
-   * @param {Function} navigateTo
+   * 举报交易对方
    */
   function goReport(order, isBuyer) {
     if (!order) return;
@@ -91,5 +121,5 @@ export function useOrderActions() {
     });
   }
 
-  return { handleMarkMet, handleConfirm, handleCancel, goReport };
+  return { handleInitiateMet, handleConfirmMet, handleCancelMetPending, handleConfirm, handleCancel, goReport };
 }

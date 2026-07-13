@@ -1,29 +1,66 @@
 # ── 校园二手交易平台 — 快速启动 ──
 
-## 前置条件
-- 本地 MySQL 已启动（端口 3306）
-- Docker Desktop 已启动（右下角鲸鱼图标变绿）
-
 ## 前端
 cd miniprogram
 npm run dev:mp-weixin
-# 在微信开发者工具打开 miniprogram/dist/dev/mp-weixin/
 
 ## Java 后端 — Docker 一键启动
-cd server-java
+cd "D:\学习资料\AI AGENT\项目\SHM\server-java"
 docker compose up -d
 
 ## 关闭
 docker compose down
 
-# 改代码后重新部署
-mvn -pl gateway,core-service,admin-service,im-connector package spring-boot:repackage -DskipTests -amd
-docker compose up -d --build
+
+# ══════════════════════════════════════════════════════════════
+# 改代码后重新部署（按你改了什么，选对应的段落执行）
+# ══════════════════════════════════════════════════════════════
+
+# ── 只改了前端 ──
+cd miniprogram
+npm run build:mp-weixin
+# 微信开发者工具刷新即可
+
+
+# ── 改了 common 模块（或 common + 服务模块）──
+# 【重要】先装 common 到本地仓库，否则服务打包时会用 .m2 里的旧版本！
+cd "D:\学习资料\AI AGENT\项目\SHM\server-java"
+mvn -pl common install -DskipTests
+mvn -pl gateway,core-service,admin-service,im-connector clean package spring-boot:repackage -DskipTests
+docker compose down
+docker compose build --no-cache core-service gateway admin-service im-connector
+docker compose up -d
+
+
+# ── 只改了某个服务模块（如 core-service），common 没改 ──
+cd "D:\学习资料\AI AGENT\项目\SHM\server-java"
+mvn -pl core-service clean package spring-boot:repackage -DskipTests
+docker compose down
+docker compose build --no-cache core-service
+docker compose up -d
+# （把 core-service 换成你改的服务名）
+
+
+# ══════════════════════════════════════════════════════════════
+# 命令解释（为什么之前会 500）
+# ══════════════════════════════════════════════════════════════
+#
+# 1. mvn -pl common install → 把 common 装到本地 .m2 仓库
+#    不加这步，服务打包时从 .m2 拿的是旧 common，新字段找不到
+#
+# 2. clean package spring-boot:repackage → 瘦 JAR→胖 JAR
+#    不加 spring-boot:repackage 生成的 JAR 只有 139KB，不含依赖
+#
+# 3. docker compose build --no-cache → 重建 Docker 镜像
+#    docker compose up -d 用的是缓存镜像，不会自动检测 JAR 变化
+#
+# 4. docker compose down → 必须先停掉，否则 build 用的是运行中的旧容器
+
 
 ## Node.js 后端（备用）
 cd server
 npm run dev
-# 前端 API 切到 http://localhost:3000
+# 前端 API 切到 http://localhost:3002
 
 ## 架构
 Docker: Nacos + Redis + 4个Java服务 + Zipkin + Prometheus + Grafana
